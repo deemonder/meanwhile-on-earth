@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Meanwhile on Earth</title>
+    <meta
+      name="description"
+      content="If an alien civilization were watching Earth from far away, what would it see right now? Pick a distance in light-years, aim at a place, and look into the past."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%232f6fdd'/%3E%3Cpath d='M32 6a26 26 0 0 1 0 52a40 40 0 0 0 0-52z' fill='%230a1024'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <main id="stage">
+        <div id="globe"></div>
+
+        <!-- The spot being watched, with the name of who held it -->
+        <div id="crosshair" aria-hidden="true"><span id="aim-label"></span></div>
+
+        <div id="absent" hidden>
+          <div class="disc"></div>
+          <div class="gas"></div>
+          <p id="absent-text"></p>
+        </div>
+
+        <header id="top">
+          <div id="brand">
+            <h1>Meanwhile on Earth</h1>
+            <button id="help" type="button">?</button>
+          </div>
+          <div id="hud">
+            <p class="label" data-t="hudKicker"></p>
+            <p id="hud-big"></p>
+            <p id="hud-details"></p>
+          </div>
+        </header>
+
+        <section id="dock">
+          <div class="dock-head">
+            <div class="readout">
+              <span class="label" data-t="distance"></span>
+              <output id="distance" for="slider ly"></output>
+            </div>
+            <label class="exact">
+              <input id="ly" type="number" min="0" step="any" inputmode="decimal" />
+              <span data-t="lightYears"></span>
+            </label>
+            <button id="borders" class="pill" type="button" aria-pressed="true">
+              <i></i><span data-t="bordersToggle"></span>
+            </button>
+            <button id="journey" class="pill primary" type="button"></button>
+          </div>
+
+          <div class="track">
+            <input id="slider" type="range" min="0" max="10000" step="1" aria-labelledby="distance" />
+            <div id="signposts"></div>
+          </div>
+
+          <div class="places">
+            <div class="places-head">
+              <span class="label" data-t="placesLabel"></span>
+              <button id="follow" class="pill small" type="button" aria-pressed="false" hidden></button>
+            </div>
+            <div id="chips"></div>
+          </div>
+        </section>
+
+        <div id="guide" hidden>
+          <div class="guide-card" role="dialog" aria-modal="true" aria-labelledby="guide-title">
+            <h2 id="guide-title"></h2>
+            <p id="guide-intro"></p>
+            <ol id="guide-steps"></ol>
+            <button id="guide-start" class="pill primary" type="button"></button>
+          </div>
+        </div>
+      </main>
+
+      <aside id="panel">
+        <div id="scroll">
+          <section id="moment"></section>
+          <section id="aim"></section>
+          <section id="nearby"></section>
+          <section id="world"></section>
+          <section id="era"></section>
+          <section id="telescope"></section>
+        </div>
+        <footer>
+          <div class="actions">
+            <button id="share" type="button"></button>
+            <button id="language" type="button"></button>
+            <span id="status"></span>
+          </div>
+          <details>
+            <summary data-t="aboutTitle"></summary>
+            <p data-t="about"></p>
+            <p>
+              <span data-t="sources"></span>:
+              <a href="https://www.wikidata.org" target="_blank" rel="noopener">Wikidata</a>,
+              <a href="https://www.wikipedia.org" target="_blank" rel="noopener">Wikipedia</a>,
+              <a href="https://github.com/aourednik/historical-basemaps" target="_blank" rel="noopener">historical-basemaps</a>,
+              <a href="https://visibleearth.nasa.gov" target="_blank" rel="noopener">NASA Visible Earth</a>.
+            </p>
+          </details>
+        </footer>
+      </aside>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

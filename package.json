@@ -1,0 +1,23 @@
+{
+  "name": "meanwhile-on-earth",
+  "version": "0.1.0",
+  "description": "If an alien civilization X light-years away looked at Earth right now, what would it see? A 3D what-if.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test",
+    "build-events": "node scripts/build-events.mjs"
+  },
+  "dependencies": {
+    "globe.gl": "^2.46.2",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.7"
+  },
+  "license": "MIT",
+  "author": "Filippo Iori"
+}
