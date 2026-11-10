@@ -13,6 +13,8 @@ const TEXT = {
     placesLabel: 'Oppure mettiti in un luogo reale',
     follow: (place) => `Guarda da ${place}`,
     help: 'Come si usa',
+    peekTitle: 'Scorri: cosa succedeva lì',
+    peekEvents: (n) => (n === 1 ? '1 evento nei dintorni' : `${n} eventi nei dintorni`),
     guideTitle: 'Guardare lontano è guardare indietro',
     guideIntro: 'La luce impiega tempo ad attraversare lo spazio. Chi ci osserva da lontano vede la Terra del passato.',
     guideSteps: [
@@ -109,6 +111,8 @@ const TEXT = {
     placesLabel: 'Or stand somewhere real',
     follow: (place) => `Look from ${place}`,
     help: 'How to use it',
+    peekTitle: 'Scroll: what was happening there',
+    peekEvents: (n) => (n === 1 ? '1 event nearby' : `${n} events nearby`),
     guideTitle: 'Looking far is looking back',
     guideIntro: 'Light takes time to cross space. Anyone watching us from far away sees the Earth of the past.',
     guideSteps: [

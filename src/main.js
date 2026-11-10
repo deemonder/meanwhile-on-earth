@@ -339,6 +339,12 @@ function render() {
   const famous = mostFamous(eventsNow.list, { except: new Set(hits.map((hit) => hit.event.id)) });
   const eraIntro = introOnceLoaded(`era|${lang}|${view.era.wiki.en}`, () => introForArticle(view.era.wiki, lang));
 
+  // On a phone the panel is below the fold: the bar at its top says what is in it.
+  const place = driftInfo ? t(ground) : map.status === 'ready' ? (territory?.name ?? unnamed) : '';
+  $('peek-summary').textContent = [place || view.era[lang][0], hits.length ? t('peekEvents', hits.length) : '']
+    .filter(Boolean)
+    .join(' · ');
+
   fill('moment', momentHtml(view));
   fill('aim', aimHtml(view, state.aim, { ...map, territory, surface, drift: driftInfo }, territoryIntro(territory)));
   fill('nearby', absent ? '' : nearbyHtml(view, hits));
@@ -464,6 +470,7 @@ function buildInterface() {
   $('help').title = t('help');
   $('help').setAttribute('aria-label', t('help'));
 
+  $('peek-title').textContent = t('peekTitle');
   $('share').textContent = t('share');
   $('language').textContent = lang === 'it' ? 'English' : 'Italiano';
   $('status').textContent = eventCount ? t('eventsLoaded', number(eventCount)) : '';
@@ -490,6 +497,7 @@ function listen() {
     requestRender();
   });
   $('journey').addEventListener('click', toggleJourney);
+  $('peek').addEventListener('click', () => $('peek').scrollIntoView({ behavior: 'smooth', block: 'start' }));
 
   $('help').addEventListener('click', () => showGuide(true));
   $('guide-start').addEventListener('click', () => showGuide(false));
