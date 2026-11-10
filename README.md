@@ -1,6 +1,10 @@
 # Meanwhile on Earth
 
+[![From the present back to before the Universe: what an observer sees from farther and farther away](docs/demo.gif)](https://deemonder.github.io/meanwhile-on-earth/)
+
 **If an alien civilization were watching Earth from far away, what would it see right now?**
+
+**[Try the live demo →](https://deemonder.github.io/meanwhile-on-earth/)**
 
 Light takes one year to cross one light-year. An observer 2,000 light-years away is receiving, today, the light that left Earth 2,000 years ago: they are watching the Roman Empire under Tiberius, while the Han rule China and the Maya build cities in Central America.
 
@@ -36,6 +40,8 @@ Other commands:
 | `npm run build` | Builds the static site into `dist/` (works on GitHub Pages) |
 | `npm test` | Checks the astronomy against worked examples from Meeus |
 | `npm run build-events` | Rebuilds `public/data/events.json` from Wikidata |
+
+Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `?poster=1200x630` shows only the planet and the headline at that size, for screenshots. The animation above and the link-preview image were made that way.
 
 ## How it works
 
@@ -97,6 +103,6 @@ Meanwhile on Earth («Nel frattempo sulla Terra») è un globo 3D che mostra que
 - **Punti di osservazione reali**: scegli Vega, la Stella Polare o le Pleiadi, e la vista si sposta sul lato della Terra che era rivolto verso quella stella.
 - **Tempo profondo**: glaciazioni, Terra palla di neve, Archeano, Adeano, e il periodo in cui la Terra non esisteva.
 
-Per avviarlo: `npm install`, poi `npm run dev`.
+Provalo subito: **[demo online](https://deemonder.github.io/meanwhile-on-earth/)**. Per avviarlo sul tuo computer: `npm install`, poi `npm run dev`.
 
 Il telescopio necessario non si può costruire: da 2.000 anni luce servirebbe uno specchio largo 1,3 miliardi di km, 8,5 volte la distanza tra la Terra e il Sole. Il sito immagina che esista.

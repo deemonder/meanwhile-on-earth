@@ -902,6 +902,87 @@ details p {
   }
 }
 
+/* ───────── Poster mode (?poster): just the planet and the headline ───────── */
+
+#poster-line {
+  display: none;
+}
+
+body.poster #app {
+  display: block;
+}
+
+body.poster #stage {
+  /* --pw and --ph are 1% of the stage, set from main.js */
+  height: 100dvh;
+}
+
+body.poster #panel,
+body.poster #dock,
+body.poster #guide,
+body.poster #help,
+body.poster #crosshair {
+  display: none;
+}
+
+body.poster #aim-label {
+  display: none;
+}
+
+/* Text in a column on the left; the planet takes the right-hand side. */
+body.poster #top {
+  inset: 0 auto 0 0;
+  width: 46%;
+  padding: 0 0 0 calc(5 * var(--pw));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: linear-gradient(90deg, rgba(3, 4, 11, 0.75) 60%, transparent);
+}
+
+body.poster #brand {
+  left: calc(5 * var(--pw));
+  top: calc(6 * var(--ph));
+}
+
+body.poster #brand h1 {
+  font-size: clamp(18px, calc(2.6 * var(--pw)), 34px);
+}
+
+body.poster #hud {
+  padding: 0;
+  text-align: left;
+}
+
+body.poster #hud .label {
+  font-size: clamp(10px, calc(1.25 * var(--pw)), 16px);
+}
+
+body.poster #hud-big {
+  margin: 0.12em 0;
+  font-size: clamp(34px, calc(6.4 * var(--pw)), 84px);
+}
+
+body.poster #hud-details {
+  justify-content: flex-start;
+  font-size: clamp(12px, calc(1.5 * var(--pw)), 19px);
+}
+
+body.poster #hud-details .chip {
+  font-size: inherit;
+}
+
+body.poster #poster-line {
+  display: block;
+  position: absolute;
+  left: calc(5 * var(--pw));
+  bottom: calc(7 * var(--ph));
+  width: 38%;
+  font: 500 clamp(12px, calc(1.55 * var(--pw)), 20px) / 1.35 var(--display);
+  color: #b9c3dc;
+  pointer-events: none;
+}
+
 /* ───────── Narrow screens: globe on top, panel underneath ───────── */
 
 @media (max-width: 900px) {
@@ -957,4 +1038,13 @@ details p {
     margin: 6px -12px 0;
     padding: 2px 12px 6px;
   }
+}
+
+/* In poster mode the stand-ins for the missing planet sit where the planet would. */
+body.poster #absent {
+  left: 40%;
+}
+
+body.poster #absent p {
+  display: none;
 }

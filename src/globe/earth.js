@@ -130,13 +130,16 @@ export async function createEarth(container, on) {
   // The controls cover the top and bottom of the stage, so the planet is
   // drawn in the middle of the free space between them, not of the canvas.
   const camera = globe.camera();
-  let margins = { top: 0, bottom: 0 };
+  let margins = { top: 0, bottom: 0, left: 0, right: 0 };
   const layOut = () => {
     const width = container.clientWidth;
     const height = container.clientHeight;
     // Negative y moves the planet up. (Setting the camera view offset directly
     // does not work: globe.gl owns it and resets it.)
-    globe.width(width).height(height).globeOffset([0, (margins.top - margins.bottom) / 2]);
+    globe
+      .width(width)
+      .height(height)
+      .globeOffset([(margins.left - margins.right) / 2, (margins.top - margins.bottom) / 2]);
   };
   new ResizeObserver(layOut).observe(container);
 
@@ -173,16 +176,19 @@ export async function createEarth(container, on) {
   };
 
   return {
-    /** Tells the scene how many pixels the controls cover at the top and bottom. */
-    setMargins(top, bottom) {
-      margins = { top, bottom };
+    /** Tells the scene how many pixels of each edge are covered by controls or text. */
+    setMargins({ top = 0, bottom = 0, left = 0, right = 0 }) {
+      margins = { top, bottom, left, right };
       layOut();
     },
 
     /** Camera altitude (in planet radii) at which the planet fills the free space. */
     fittingAltitude() {
       const height = container.clientHeight;
-      const free = Math.min(container.clientWidth, height - margins.top - margins.bottom);
+      const free = Math.min(
+        container.clientWidth - margins.left - margins.right,
+        height - margins.top - margins.bottom,
+      );
       const radiusOnScreen = Math.max(120, free * 0.46);
       const k = (radiusOnScreen * Math.tan((camera.fov * Math.PI) / 360)) / (height / 2);
       const altitude = 1 / Math.sin(Math.atan(k)) - 1;

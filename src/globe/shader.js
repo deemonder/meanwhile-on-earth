@@ -156,7 +156,7 @@ export const surface = {
 
       // The Sun on open water: a tight glint inside a wide soft sheen.
       float alignment = max(dot(n, normalize(toCamera + uSun)), 0.0);
-      float glint = pow(alignment, 260.0) * 1.3 + pow(alignment, 28.0) * 0.14;
+      float glint = pow(alignment, 260.0) * 0.8 + pow(alignment, 28.0) * 0.12;
       float openWater = water * (1.0 - ice) * (1.0 - uSnowball) * (1.0 - uMolten) * (1.0 - 0.8 * uCloudCover * cloudAbove);
       colour += vec3(1.0, 0.94, 0.82) * glint * openWater * lit;
 

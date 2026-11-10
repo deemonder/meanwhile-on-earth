@@ -207,6 +207,7 @@ async function fetchMap() {
 
 function renderHud(view) {
   const { big, details } = headline(view.calendar, view.age);
+  $('hud-kicker').textContent = t('hudKicker', distanceText(view.age));
   $('hud-big').textContent = big;
   fill(
     'hud-details',
@@ -462,9 +463,19 @@ function listen() {
 // ───────── Start ─────────
 
 async function start() {
+  // ?poster shows only the planet and the headline: used for screenshots and
+  // for the link-preview image.
+  // ?poster=1200x630 fixes the size of the picture whatever the window is.
+  const posterParam = new URLSearchParams(location.search).get('poster');
+  const poster = posterParam !== null;
+  document.body.classList.toggle('poster', poster);
+  const [posterWidth, posterHeight] = (posterParam ?? '').split('x').map(Number);
+  if (posterWidth > 0 && posterHeight > 0) {
+    Object.assign($('stage').style, { width: `${posterWidth}px`, height: `${posterHeight}px` });
+  }
   buildInterface();
   listen();
-  if (!remember('guide')) showGuide(true);
+  if (!poster && !remember('guide')) showGuide(true);
 
   const firstAim = state.aim;
   earth = await createEarth($('globe'), {
@@ -482,9 +493,17 @@ async function start() {
   });
   // Keep the planet and the crosshair centred in the space the controls leave free.
   const frame = () => {
-    const top = $('hud').getBoundingClientRect().bottom - $('stage').getBoundingClientRect().top;
-    const bottom = $('stage').getBoundingClientRect().bottom - $('dock').getBoundingClientRect().top;
-    earth.setMargins(top, bottom);
+    const stage = $('stage').getBoundingClientRect();
+    if (poster) {
+      $('stage').style.setProperty('--pw', `${stage.width / 100}px`);
+      $('stage').style.setProperty('--ph', `${stage.height / 100}px`);
+      // Text on the left, the planet filling the right-hand side.
+      earth.setMargins({ left: stage.width * 0.4, top: stage.height * 0.04, bottom: stage.height * 0.04 });
+      return;
+    }
+    const top = $('hud').getBoundingClientRect().bottom - stage.top;
+    const bottom = stage.bottom - $('dock').getBoundingClientRect().top;
+    earth.setMargins({ top, bottom });
     $('stage').style.setProperty('--lift', `${(bottom - top) / 2}px`);
   };
   frame();
