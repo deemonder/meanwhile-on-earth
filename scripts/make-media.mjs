@@ -81,14 +81,18 @@ function deepTime() {
 
 // `width`, `fps` and `colours` trade sharpness for file size. A clip in which
 // the camera moves changes every pixel of every frame, so it gets less of each.
+// `clockSpeed` is how fast the app's own animations run in the clip (1 = as
+// in the app). The looping clip has none: its last frame must meet its first.
 const CLIPS = {
-  // Back through recorded history. The camera stays still so that the only
-  // things moving are the year and the borders; early on, the pace is quicker
-  // to get past the decades in which nothing on the map changes.
+  // Back through recorded history. The camera stays on the Mediterranean while
+  // the year and the borders change, and the sky wheels behind the planet.
+  // Early on the pace is quicker, to get past the decades in which nothing on
+  // the map changes.
   history: {
     width: 720,
     fps: 12,
     colours: 128,
+    clockSpeed: 3,
     frames: withPauses(
       frames(126, (t) => ({
         ly: sameHourDistance(lyFromSlider(lerp(sliderFromLy(1), sliderFromLy(5200), t ** 0.62)), NOW),
@@ -100,7 +104,7 @@ const CLIPS = {
     ),
   },
   // From the last ice age to before the Universe, with the planet turning.
-  'deep-time': { width: 520, fps: 10, colours: 80, frames: withPauses(deepTime(), 0, 12) },
+  'deep-time': { width: 520, fps: 10, colours: 80, clockSpeed: 2, frames: withPauses(deepTime(), 0, 12) },
   // One turn around today's Earth with the borders off: a seamless loop.
   planet: {
     width: 560,
@@ -110,8 +114,9 @@ const CLIPS = {
   },
 };
 
-const urlFor = ({ ly, lat, lng, borders }) =>
+const urlFor = ({ ly, lat, lng, borders, clock }) =>
   `${APP}/?poster=${WIDTH}x${HEIGHT}&lang=en&at=${AT}${borders ? `&borders=${borders}` : ''}` +
+  (clock === undefined ? '' : `&t=${clock.toFixed(3)}`) +
   `#ly=${Number(ly.toPrecision(12))}&lat=${lat.toFixed(3)}&lng=${(((lng + 540) % 360) - 180).toFixed(3)}`;
 
 const exists = (file) => stat(file).then((s) => s.size > 0, () => false);
@@ -135,7 +140,13 @@ async function photograph(url, file, profile) {
 async function record(name, clip, work) {
   const dir = join(work, name);
   await mkdir(dir, { recursive: true });
-  const todo = clip.frames.map((view, i) => ({ view, file: join(dir, `${String(i).padStart(4, '0')}.png`) }));
+  // Each frame is rendered from scratch, so the app's own animations (clouds
+  // drifting, stars twinkling and turning) would be stuck at the same instant
+  // in every one. Give each frame its moment on the animation clock instead.
+  const todo = clip.frames.map((view, i) => ({
+    view: clip.clockSpeed ? { ...view, clock: (i * clip.clockSpeed) / clip.fps } : view,
+    file: join(dir, `${String(i).padStart(4, '0')}.png`),
+  }));
   const total = todo.length;
 
   let done = 0;

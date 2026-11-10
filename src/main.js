@@ -576,6 +576,11 @@ async function start() {
   state.aim = firstAim;
   earth.aim(firstAim, 0, earth.fittingAltitude());
 
+  // ?t=12.5 freezes the animation clock (clouds, stars) at that many seconds,
+  // so a recording can step through it frame by frame.
+  const clock = new URLSearchParams(location.search).get('t');
+  if (clock !== null && Number.isFinite(Number(clock))) earth.setClock(Number(clock));
+
   state.follow = canFollow(placeById(state.place));
   if (state.follow) flyToOverhead(0);
   render();

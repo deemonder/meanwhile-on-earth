@@ -10,6 +10,11 @@ import {
 
 const FAR = 20000; // inside globe.gl's far plane, well beyond the camera's reach
 
+// The camera rides with the planet, so the stars wheel slowly around Earth's
+// axis behind it. Far faster than the real fifteen degrees an hour, and far
+// slower than the centuries on the slider: just enough to feel time passing.
+const SKY_TURN = (0.6 * Math.PI) / 180; // radians per second
+
 // Seeded, so the sky is the same on every visit.
 function randomSource(seed) {
   let s = seed;
@@ -204,7 +209,13 @@ export function createSky(scene) {
 
   return {
     tick(dt) {
-      stars.material.uniforms.uTime.value += dt;
+      this.setTime(stars.material.uniforms.uTime.value + dt);
+    },
+
+    /** Sets the animation clock: how far the stars have twinkled and turned. */
+    setTime(seconds) {
+      stars.material.uniforms.uTime.value = seconds;
+      stars.rotation.y = -seconds * SKY_TURN; // westward, like the real sky
     },
 
     /** Hides the stars for the time before there were any. */
