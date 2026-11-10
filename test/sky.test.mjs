@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  J2000, calendarFromJd, decimalYear, deltaT, departureJd, jdFromUnix, mirrorNeeded, precess,
+  J2000, calendarFromJd, decimalYear, deltaT, departureJd, jdFromUnix, mirrorNeeded, precess, sameHourDistance,
   separation, siderealTime, subObserverPoint, subsolarPoint, sunPosition, visibilityOverADay,
 } from '../src/core/sky.js';
 import { MAX_LY, MIN_LY, lyFromSlider, sliderFromLy } from '../src/core/scale.js';
@@ -98,4 +98,20 @@ test('slider scale is monotonic and reversible', () => {
   }
   near(lyFromSlider(0), MIN_LY, MIN_LY * 1e-9, 'lower end');
   near(lyFromSlider(1), MAX_LY, 1, 'upper end');
+});
+
+test('same-hour distances keep the Sun over the same place', () => {
+  const now = jdFromUnix(Date.UTC(2026, 10, 10, 10, 30));
+  const sunNow = subsolarPoint(now);
+  for (const wanted of [1, 37.4, 500, 2000, 4586]) {
+    const ly = sameHourDistance(wanted, now);
+    near(ly, wanted, 0.6, `stays close to ${wanted} light-years`);
+    const sunThen = subsolarPoint(departureJd(ly, now));
+    // The Sun is overhead within a few degrees of where it is now: the same
+    // time of day and season. (An arbitrary distance would land anywhere.)
+    assert.ok(separation(sunThen, sunNow) < 6, `${wanted} ly: Sun moved ${separation(sunThen, sunNow).toFixed(1)}°`);
+  }
+  // Outside the range where rotation is known, distances pass through unchanged.
+  assert.equal(sameHourDistance(0.5, now), 0.5);
+  assert.equal(sameHourDistance(50000, now), 50000);
 });

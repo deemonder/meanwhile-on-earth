@@ -1,6 +1,6 @@
 # Meanwhile on Earth
 
-[![From the present back to before the Universe: what an observer sees from farther and farther away](docs/demo.gif)](https://deemonder.github.io/meanwhile-on-earth/)
+[![Moving away from Earth, the year runs backwards and the borders of history change](docs/history.gif)](https://deemonder.github.io/meanwhile-on-earth/)
 
 **If an alien civilization were watching Earth from far away, what would it see right now?**
 
@@ -20,11 +20,21 @@ Meanwhile on Earth is a 3D globe that shows that view. Pick a distance, aim at a
 - **Events of the time**: battles, eruptions, earthquakes, treaties, cities and universities founded, monuments built, famous births. Each one is a dot on the globe and a link to Wikipedia.
 - **Real day and night.** The terminator is where it actually was when the light left. City lights appear only after electricity does.
 - **A planet, not a map.** Drifting clouds and their shadows, mountain relief, the Sun glinting off the oceans, and an atmosphere that glows at the limb and reddens at dusk. The historical borders are a layer you can switch off.
-- **Journey through time.** One button drifts you away from Earth and plays history backwards, from today to before the planet formed.
+- **Journey through time.** One button drifts you away from Earth and plays history backwards, from today to before the planet formed. It steps through distances whose light left at the same time of day, so the Sun stays put while the centuries change.
 - **Real vantage points.** Choose Vega, Polaris, the Pleiades or another star, and the camera moves to the side of Earth that faced it at that moment. The star appears in the sky by name, and rings mark the point that has it overhead.
 - **Deep time.** Ice ages, Snowball Earth, the oxygen-free Archean, the molten Hadean, and the time before Earth existed.
 - **A reality check**: the panel says how large a telescope mirror would have to be. From 2,000 light-years it is 1.3 billion km across, 8.5 times the distance from Earth to the Sun.
 - Italian and English. Every view has a shareable link.
+
+## See it move
+
+Keep going and the planet itself changes: ice sheets, drifting continents, a frozen world, green seas, a magma ocean, and then no Earth at all.
+
+![From the last ice age to before the Universe](docs/deep-time.gif)
+
+With the borders switched off it is just the planet, lit from where the Sun really is, with city lights on the night side.
+
+![One turn around today's Earth](docs/planet.gif)
 
 ## Run it
 
@@ -41,7 +51,7 @@ Other commands:
 | `npm test` | Checks the astronomy against worked examples from Meeus |
 | `npm run build-events` | Rebuilds `public/data/events.json` from Wikidata |
 
-Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `?poster=1200x630` shows only the planet and the headline at that size, for screenshots. The animation above and the link-preview image were made that way.
+Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `?poster=1200x630` shows only the planet and the headline at that size, for screenshots. The link-preview image was made that way, and so were the animations: `npm run make-media` photographs the app frame by frame with a headless browser and joins the frames with ffmpeg. A third parameter, `?at=2026-11-10T10:30:00Z`, freezes the clock so every frame shows the same instant.
 
 ## How it works
 
