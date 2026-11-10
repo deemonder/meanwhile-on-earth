@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test",
-    "build-events": "node scripts/build-events.mjs"
+    "build-events": "node scripts/build-events.mjs",
+    "make-media": "node scripts/make-media.mjs"
   },
   "dependencies": {
     "globe.gl": "^2.46.2",

@@ -95,6 +95,26 @@ export function deltaT(year) {
 /** Converts a uniform-time Julian Date (TT) into a rotation-based one (UT). */
 export const utFromTt = (jdTt) => jdTt - deltaT(decimalYear(jdTt)) / 86400;
 
+/**
+ * The distance closest to `lightYears` whose light left Earth at the same
+ * time of day and in the same season as the light leaving now.
+ *
+ * Moving the distance smoothly makes day and night flicker, because every
+ * extra year of light travel is 365.25 days: a quarter turn of the planet.
+ * Stepping through these distances instead keeps the Sun where it is, so a
+ * trip through the centuries shows history changing, not the lighting.
+ */
+export function sameHourDistance(lightYears, nowJd) {
+  if (lightYears < 1 || lightYears > ROTATION_KNOWN_FOR) return lightYears;
+  const TROPICAL_YEAR = 365.2422; // days from one spring equinox to the next
+  const years = Math.round((lightYears * DAYS_PER_YEAR) / TROPICAL_YEAR);
+  const days = Math.round(years * TROPICAL_YEAR); // whole days: same clock time
+  // Clock time is uniform but the planet's spin is not: add what the
+  // slowdown amounts to between then and now.
+  const slowdown = deltaT(decimalYear(nowJd - days)) - deltaT(decimalYear(nowJd));
+  return (days - slowdown / 86400) / DAYS_PER_YEAR;
+}
+
 /** Greenwich Mean Sidereal Time in degrees: Earth's rotation angle. (Meeus 12.4) */
 export function siderealTime(jdUt) {
   const d = jdUt - J2000;

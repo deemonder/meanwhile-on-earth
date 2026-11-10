@@ -4,7 +4,8 @@
 // in step with it: the globe, the controls around it and the side panel.
 import './style.css';
 import {
-  ROTATION_KNOWN_FOR, calendarFromJd, decimalYear, departureJd, jdFromUnix, separation, subObserverPoint, subsolarPoint,
+  ROTATION_KNOWN_FOR, calendarFromJd, decimalYear, departureJd, jdFromUnix, sameHourDistance, separation,
+  subObserverPoint, subsolarPoint,
 } from './core/sky.js';
 import { clampLy, lyFromSlider, sliderFromLy } from './core/scale.js';
 import { loadMap, mapFor, territoryAt } from './data/borders.js';
@@ -24,6 +25,11 @@ const SLIDER_STEPS = 10000;
 const MAX_DOTS = 500;
 /** Wikidata has next to nothing dated before this many years ago. */
 const RECORDED_HISTORY = 5500;
+
+// A link can freeze the clock (?at=2026-11-10T10:30:00Z), so that pictures
+// taken minutes apart show the same instant. Otherwise "now" is now.
+const frozenNow = Date.parse(new URLSearchParams(location.search).get('at') ?? '');
+const nowMs = () => (Number.isFinite(frozenNow) ? frozenNow : Date.now());
 
 // ───────── State ─────────
 
@@ -94,7 +100,7 @@ const shortName = (place) => place[lang].replace(/\s*\(.*\)/, '');
 /** Everything that follows from the distance alone. */
 function computeView() {
   const age = state.ly;
-  const jd = departureJd(age, jdFromUnix(Date.now()));
+  const jd = departureJd(age, jdFromUnix(nowMs()));
   const year = decimalYear(jd);
   const era = eraAt(age);
   const place = placeById(state.place);
@@ -346,7 +352,8 @@ function toggleJourney() {
     last = now;
     const inHistory = trip.position > 0.3 && trip.position < 0.62;
     trip.position += dt / (inHistory ? 110 : 45);
-    state.ly = lyFromSlider(Math.min(1, trip.position));
+    // Step through distances that keep the Sun in place, or day and night would flicker.
+    state.ly = sameHourDistance(lyFromSlider(Math.min(1, trip.position)), jdFromUnix(nowMs()));
     if (trip.position >= 1) journey = null;
     writeHash();
     render();
@@ -469,6 +476,7 @@ async function start() {
   const posterParam = new URLSearchParams(location.search).get('poster');
   const poster = posterParam !== null;
   document.body.classList.toggle('poster', poster);
+  if (new URLSearchParams(location.search).get('borders') === 'off') state.borders = false;
   const [posterWidth, posterHeight] = (posterParam ?? '').split('x').map(Number);
   if (posterWidth > 0 && posterHeight > 0) {
     Object.assign($('stage').style, { width: `${posterWidth}px`, height: `${posterHeight}px` });
