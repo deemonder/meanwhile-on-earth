@@ -66,6 +66,7 @@ export const surface = {
     uniform sampler2D uRelief;   // height map
     uniform sampler2D uClouds;
     uniform sampler2D uBorders;  // historical map, drawn on a canvas
+    uniform sampler2D uPaleoMap; // reconstructed continents, drawn on a canvas
     uniform vec3 uSun;           // direction to the Sun, world space
     uniform vec3 uAir;           // colour of the atmosphere
     uniform float uCloudShift;
@@ -74,6 +75,7 @@ export const surface = {
     uniform float uCityLights;
     uniform float uIce;          // 0 none … 1 Last Glacial Maximum
     uniform float uPaleo;        // continents were elsewhere: show ghosts
+    uniform float uDrift;        // 1 when a reconstruction is loaded to show instead
     uniform float uSnowball;
     uniform float uArchean;
     uniform float uMolten;
@@ -108,7 +110,8 @@ export const surface = {
       float slopeNorth = texture2D(uRelief, vUv + vec2(0.0, texel.y)).r - texture2D(uRelief, vUv - vec2(0.0, texel.y)).r;
       vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), n) + vec3(1e-4, 0.0, 0.0));
       vec3 north = cross(n, east);
-      float reliefStrength = 7.0 * (1.0 - uSnowball) * (1.0 - uMolten);
+      // Today's mountains mean nothing on a reconstructed map.
+      float reliefStrength = 7.0 * (1.0 - uSnowball) * (1.0 - uMolten) * (1.0 - uDrift);
       vec3 relief = normalize(n - reliefStrength * (slopeEast * east + slopeNorth * north));
 
       // Ice ages. The sheets reached furthest south over North America (~40°N)
@@ -124,6 +127,16 @@ export const surface = {
       // into the sea and remain only as a reference.
       vec3 ocean = vec3(0.02, 0.07, 0.2);
       ground = mix(ground, mix(ocean, ground, 0.3), uPaleo * (1.0 - water));
+
+      // Continental drift. Where a reconstruction is loaded it replaces today's
+      // geography altogether. Its canvas holds opaque land, a faint halo for
+      // the shallow seas around it, and nothing over open ocean.
+      vec4 paleo = texture2D(uPaleoMap, vUv);
+      float paleoLand = smoothstep(0.6, 0.92, paleo.a);
+      vec3 paleoSea = mix(vec3(0.012, 0.055, 0.17), vec3(0.05, 0.3, 0.4), smoothstep(0.0, 0.5, paleo.a));
+      vec3 paleoRock = paleo.rgb * (0.7 + 0.6 * fbm(n * 16.0));
+      ground = mix(ground, mix(paleoSea, paleoRock, paleoLand), uDrift);
+      water = mix(water, 1.0 - paleoLand, uDrift);
 
       // Snowball Earth: ice everywhere, crossed by darker fractures.
       vec3 snow = vec3(0.86, 0.91, 0.96) - 0.2 * smoothstep(0.52, 0.72, fbm(n * 14.0));

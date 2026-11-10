@@ -39,6 +39,11 @@ const TEXT = {
     mapLoading: 'Carico la mappa storica…',
     mapFailed: 'Non riesco a caricare la mappa storica. Controlla la connessione.',
     ghostContinents: 'I continenti erano disposti diversamente: quelli di oggi sono disegnati in trasparenza solo come riferimento.',
+    dryLand: 'Terra emersa',
+    ocean: 'Oceano',
+    driftNote: (age) =>
+      `I continenti sono dove li colloca la ricostruzione delle placche per ${age} milioni di anni fa. Le coste sono quelle di oggi trasportate dalle placche, non le rive vere di allora.`,
+    driftUnknown: 'Oltre un miliardo di anni fa la posizione dei continenti non è nota. È mostrata la ricostruzione più antica disponibile, solo come indicazione.',
     day: 'Qui è giorno',
     twilight: 'Qui è il crepuscolo',
     nightDark: 'Qui è notte, e non c’è luce elettrica: vedresti solo buio',
@@ -130,6 +135,11 @@ const TEXT = {
     mapLoading: 'Loading the historical map…',
     mapFailed: 'Could not load the historical map. Check your connection.',
     ghostContinents: 'The continents were arranged differently: today’s are drawn faintly, only as a reference.',
+    dryLand: 'Dry land',
+    ocean: 'Ocean',
+    driftNote: (age) =>
+      `The continents are where the plate reconstruction puts them ${age} million years ago. The coasts are today’s, carried by their plates, not the true shorelines of the time.`,
+    driftUnknown: 'Beyond a billion years ago nobody knows where the continents were. The oldest available reconstruction is shown, only as an indication.',
     day: 'It is daytime here',
     twilight: 'It is twilight here',
     nightDark: 'It is night here, with no electric light: you would see only darkness',
