@@ -13,6 +13,7 @@ import { createSky } from './sky.js';
 const RADIUS = 100; // globe.gl's planet radius, in scene units
 const CLOUD_HEIGHT = 1.006;
 const AIR_HEIGHT = 1.13;
+const CLOUD_DRIFT = 0.0006; // turns of the planet per second
 const EASED = [
   'uBordersMix', 'uCityLights', 'uCloudCover', 'uIce', 'uPaleo', 'uDrift', 'uSnowball', 'uArchean', 'uMolten',
 ];
@@ -153,18 +154,24 @@ export async function createEarth(container, on) {
   };
   new ResizeObserver(layOut).observe(container);
 
-  // Ease towards the targets so eras melt into each other; drift the clouds.
+  // Ease towards the targets so eras melt into each other; drift the clouds
+  // and turn the sky, unless the clock has been set by hand.
+  let clockFrozen = false;
   let last = performance.now();
   (function animate(now) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    uniforms.uTime.value += dt;
-    uniforms.uCloudShift.value = (uniforms.uCloudShift.value + dt * 0.0006) % 1;
-    const blend = 1 - Math.exp(-dt * 5);
+    if (!clockFrozen) {
+      uniforms.uTime.value += dt;
+      uniforms.uCloudShift.value = (uniforms.uCloudShift.value + dt * CLOUD_DRIFT) % 1;
+      sky.tick(dt);
+    }
+    // With the clock set by hand (a recording), jump straight to the targets:
+    // each frame must show its own state, not a blend on the way to it.
+    const blend = clockFrozen ? 1 : 1 - Math.exp(-dt * 5);
     for (const name of EASED) uniforms[name].value += (targets[name] - uniforms[name].value) * blend;
     uniforms.uAir.value.lerp(targetAir, blend);
     uniforms.uTint.value.lerp(targetTint, blend);
-    sky.tick(dt);
     requestAnimationFrame(animate);
   })(last);
 
@@ -203,6 +210,23 @@ export async function createEarth(container, on) {
       const k = (radiusOnScreen * Math.tan((camera.fov * Math.PI) / 360)) / (height / 2);
       const altitude = 1 / Math.sin(Math.atan(k)) - 1;
       return Math.min(4.4, Math.max(0.6, altitude));
+    },
+
+    /**
+     * Stops the animation clock at `seconds`: clouds, twinkling and the turn
+     * of the sky all sit where they would be at that moment. Used to record
+     * animations one frame at a time.
+     */
+    setClock(seconds) {
+      clockFrozen = true;
+      uniforms.uTime.value = seconds;
+      uniforms.uCloudShift.value = (seconds * CLOUD_DRIFT) % 1;
+      sky.setTime(seconds);
+    },
+
+    /** True once every eased value has reached its target: the picture has stopped changing. */
+    isSettled() {
+      return EASED.every((name) => Math.abs(targets[name] - uniforms[name].value) < 0.01);
     },
 
     /** Points the camera so that (lat, lng) sits under the crosshair. */

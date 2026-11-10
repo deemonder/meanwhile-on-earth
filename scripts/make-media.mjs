@@ -1,17 +1,16 @@
 // Records the animated GIFs shown in the README.
 //
 // Each clip is a list of frames; each frame is one view of the app (a
-// distance, a place to look at) opened in poster mode by a headless browser
-// and photographed. Because every frame is rendered from scratch at a frozen
-// instant, the result is the same on any machine, however slow.
+// distance, a place to look at, a moment on the animation clock). The script
+// opens the app once in poster mode, in a headless browser, and for every
+// frame changes the link, waits for the page to say that view is completely
+// drawn, and photographs it. Nothing depends on how fast the machine is.
 //
 //   npm run dev                       (in another terminal)
 //   BROWSER="C:\path\to\msedge.exe" npm run make-media -- [clip ...]
 //
 // Needs a Chromium-based browser (Edge, Chrome) and ffmpeg on the PATH.
 // Options: --url http://localhost:5173   where the app is running
-//          --jobs 4                      browsers running at once
-//          --resume                      keep frames already taken by an earlier run
 
 import { execFile } from 'node:child_process';
 import { mkdir, rm, stat } from 'node:fs/promises';
@@ -19,6 +18,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import puppeteer from 'puppeteer-core';
 import { MIN_LY, lyFromSlider, sliderFromLy } from '../src/core/scale.js';
 import { jdFromUnix, sameHourDistance } from '../src/core/sky.js';
 
@@ -28,15 +28,8 @@ const option = (name, fallback) => {
   const at = args.indexOf(`--${name}`);
   return at < 0 ? fallback : args.splice(at, 2)[1];
 };
-const flag = (name) => {
-  const at = args.indexOf(`--${name}`);
-  if (at >= 0) args.splice(at, 1);
-  return at >= 0;
-};
 
 const APP = option('url', 'http://localhost:5173');
-const JOBS = Number(option('jobs', 4));
-const RESUME = flag('resume');
 const BROWSER = process.env.BROWSER;
 if (!BROWSER) throw new Error('Set BROWSER to the path of Edge or Chrome.');
 
@@ -58,17 +51,17 @@ const withPauses = (list, before, after) => [
 // Earth. Instead each chapter gets its share of frames, and the distance runs
 // from `from` to `to` (in light-years) within it.
 const DEEP_CHAPTERS = [
-  { from: 13e3, to: 27e3, frames: 14 }, // last ice age, up to its peak
-  { from: 30e3, to: 2.5e6, frames: 12 }, // early humans
-  { from: 3e6, to: 60e6, frames: 10 }, // age of mammals
-  { from: 66e6, to: 250e6, frames: 14 }, // dinosaurs, Pangaea
-  { from: 260e6, to: 630e6, frames: 10 }, // first animals
-  { from: 640e6, to: 715e6, frames: 14 }, // Snowball Earth
-  { from: 730e6, to: 3.9e9, frames: 16 }, // green seas, no oxygen
-  { from: 4.02e9, to: 4.49e9, frames: 14 }, // magma ocean
-  { from: 4.545e9, to: 4.595e9, frames: 10 }, // Earth still forming
-  { from: 4.7e9, to: 13.5e9, frames: 10 }, // before the Sun
-  { from: 13.8e9, to: 14e9, frames: 6 }, // before the Big Bang
+  { from: 13e3, to: 27e3, frames: 12 }, // last ice age, up to its peak
+  { from: 30e3, to: 2.5e6, frames: 8 }, // early humans
+  { from: 5e6, to: 60e6, frames: 14 }, // India crosses the ocean
+  { from: 66e6, to: 250e6, frames: 30 }, // the Atlantic closes: Pangaea
+  { from: 255e6, to: 630e6, frames: 20 }, // Pangaea comes apart again, backwards
+  { from: 640e6, to: 715e6, frames: 12 }, // Snowball Earth
+  { from: 730e6, to: 3.9e9, frames: 14 }, // green seas, no oxygen
+  { from: 4.02e9, to: 4.49e9, frames: 12 }, // magma ocean
+  { from: 4.545e9, to: 4.595e9, frames: 8 }, // Earth still forming
+  { from: 4.7e9, to: 13.5e9, frames: 8 }, // before the Sun
+  { from: 13.8e9, to: 14e9, frames: 4 }, // before the Big Bang
 ];
 
 function deepTime() {
@@ -76,19 +69,24 @@ function deepTime() {
     frames(chapter.frames, (t) => 10 ** lerp(Math.log10(chapter.from), Math.log10(chapter.to), t)),
   );
   // The planet keeps turning at a steady pace through every chapter.
-  return distances.map((ly, i) => ({ ly, lat: 18, lng: 25 - i * 0.9 }));
+  return distances.map((ly, i) => ({ ly, lat: 12, lng: 25 - i * 0.8 }));
 }
 
 // `width`, `fps` and `colours` trade sharpness for file size. A clip in which
 // the camera moves changes every pixel of every frame, so it gets less of each.
+// `clockSpeed` is how fast the app's own animations (clouds, twinkling, the
+// turn of the sky) run in the clip: 1 is as in the app. In the looping clip the
+// clock stands still, because its last frame must meet its first.
 const CLIPS = {
-  // Back through recorded history. The camera stays still so that the only
-  // things moving are the year and the borders; early on, the pace is quicker
-  // to get past the decades in which nothing on the map changes.
+  // Back through recorded history. The camera stays on the Mediterranean while
+  // the year and the borders change, and the sky wheels behind the planet.
+  // Early on the pace is quicker, to get past the decades in which nothing on
+  // the map changes.
   history: {
     width: 720,
     fps: 12,
     colours: 128,
+    clockSpeed: 3,
     frames: withPauses(
       frames(126, (t) => ({
         ly: sameHourDistance(lyFromSlider(lerp(sliderFromLy(1), sliderFromLy(5200), t ** 0.62)), NOW),
@@ -99,59 +97,65 @@ const CLIPS = {
       16,
     ),
   },
-  // From the last ice age to before the Universe, with the planet turning.
-  'deep-time': { width: 520, fps: 10, colours: 80, frames: withPauses(deepTime(), 0, 12) },
+  // From the last ice age to before the Universe, the continents drifting
+  // back into Pangaea on the way, with the planet turning.
+  'deep-time': { width: 520, fps: 10, colours: 80, clockSpeed: 2, frames: withPauses(deepTime(), 0, 12) },
   // One turn around today's Earth with the borders off: a seamless loop.
   planet: {
     width: 560,
     fps: 10,
     colours: 112,
-    frames: frames(61, (t) => ({ ly: MIN_LY * 1.07, lat: 18, lng: 15 - 360 * t, borders: 'off' })).slice(0, 60),
+    clockSpeed: 0,
+    query: '&borders=off',
+    frames: frames(61, (t) => ({ ly: MIN_LY * 1.07, lat: 18, lng: 15 - 360 * t })).slice(0, 60),
   },
 };
 
-const urlFor = ({ ly, lat, lng, borders }) =>
-  `${APP}/?poster=${WIDTH}x${HEIGHT}&lang=en&at=${AT}${borders ? `&borders=${borders}` : ''}` +
-  `#ly=${Number(ly.toPrecision(12))}&lat=${lat.toFixed(3)}&lng=${(((lng + 540) % 360) - 180).toFixed(3)}`;
+/** The part of the link that changes from frame to frame. */
+const hashFor = ({ ly, lat, lng }, clock) =>
+  `#ly=${Number(ly.toPrecision(12))}&lat=${lat.toFixed(3)}&lng=${(((lng + 540) % 360) - 180).toFixed(3)}` +
+  `&t=${clock.toFixed(3)}`;
 
-const exists = (file) => stat(file).then((s) => s.size > 0, () => false);
-
-async function photograph(url, file, profile) {
-  await run(
-    BROWSER,
-    [
-      '--headless=new', '--no-first-run', '--hide-scrollbars', '--enable-unsafe-swiftshader',
-      `--user-data-dir=${profile}`,
-      // Larger than the picture: the poster has a fixed size and is cropped out later.
-      `--window-size=${WIDTH + 200},${HEIGHT + 250}`,
-      '--virtual-time-budget=10000', // let textures load and the shader settle
-      `--screenshot=${file}`,
-      url,
-    ],
-    { timeout: 120_000 },
-  ).catch(() => {}); // the browser prints noise on stderr; the file is what counts
+/** Resolves once the page reports that the view for `hash` is completely drawn. */
+async function settle(page, hash) {
+  await page.waitForFunction(
+    (wanted) => {
+      const { view, settled } = document.documentElement.dataset;
+      return view === wanted && settled === 'true';
+    },
+    { timeout: 60_000, polling: 'raf' },
+    hash,
+  );
+  // Two more frames, so the last canvas upload has reached the screen.
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 }
 
-async function record(name, clip, work) {
+async function record(browser, name, clip, work) {
   const dir = join(work, name);
+  await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
-  const todo = clip.frames.map((view, i) => ({ view, file: join(dir, `${String(i).padStart(4, '0')}.png`) }));
-  const total = todo.length;
 
-  let done = 0;
-  await Promise.all(
-    Array.from({ length: JOBS }, async (_, worker) => {
-      const profile = join(work, `profile-${worker}`);
-      for (let job = todo.shift(); job; job = todo.shift()) {
-        for (let attempt = 0; attempt < 3 && !(await exists(job.file)); attempt++) {
-          await photograph(urlFor(job.view), job.file, profile);
-        }
-        if (!(await exists(job.file))) throw new Error(`could not capture ${job.file}`);
-        process.stdout.write(`\r${name}: ${++done}/${total} frames`);
-      }
-    }),
-  );
+  const clockAt = (i) => (i * clip.clockSpeed) / clip.fps;
+  const page = await browser.newPage();
+  await page.setViewport({ width: WIDTH + 80, height: HEIGHT + 80, deviceScaleFactor: 1 });
+  const first = hashFor(clip.frames[0], clockAt(0));
+  await page.goto(`${APP}/?poster=${WIDTH}x${HEIGHT}&lang=en&at=${AT}${clip.query ?? ''}${first}`);
+  await settle(page, first);
+
+  for (const [i, view] of clip.frames.entries()) {
+    const hash = hashFor(view, clockAt(i));
+    if (i > 0) {
+      await page.evaluate((next) => (location.hash = next), hash);
+      await settle(page, hash);
+    }
+    await page.screenshot({
+      path: join(dir, `${String(i).padStart(4, '0')}.png`),
+      clip: { x: 0, y: 0, width: WIDTH, height: HEIGHT },
+    });
+    process.stdout.write(`\r${name}: ${i + 1}/${clip.frames.length} frames`);
+  }
   console.log();
+  await page.close();
 
   const docs = fileURLToPath(new URL('../docs/', import.meta.url));
   await mkdir(docs, { recursive: true });
@@ -159,20 +163,28 @@ async function record(name, clip, work) {
   await run('ffmpeg', [
     '-v', 'error', '-y', '-framerate', String(clip.fps), '-i', join(dir, '%04d.png'),
     '-vf',
-    `crop=${WIDTH}:${HEIGHT}:0:0,scale=${clip.width}:-1:flags=lanczos,split[a][b];` +
+    `scale=${clip.width}:-1:flags=lanczos,split[a][b];` +
       `[a]palettegen=max_colors=${clip.colours}:stats_mode=diff[p];` +
       '[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle',
     '-loop', '0', out,
   ]);
-  const seconds = (total / clip.fps).toFixed(1);
+  const seconds = (clip.frames.length / clip.fps).toFixed(1);
   console.log(`  → docs/${name}.gif  ${((await stat(out)).size / 1e6).toFixed(1)} MB, ${seconds} s`);
 }
 
 const wanted = args.length ? args : Object.keys(CLIPS);
-const work = join(tmpdir(), 'meanwhile-on-earth-media');
 for (const name of wanted) {
   if (!CLIPS[name]) throw new Error(`Unknown clip "${name}". Choose from: ${Object.keys(CLIPS).join(', ')}`);
-  if (!RESUME) await rm(join(work, name), { recursive: true, force: true });
-  await record(name, CLIPS[name], work);
+}
+const work = join(tmpdir(), 'meanwhile-on-earth-media');
+const browser = await puppeteer.launch({
+  executablePath: BROWSER,
+  headless: true,
+  args: ['--hide-scrollbars', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+});
+try {
+  for (const name of wanted) await record(browser, name, CLIPS[name], work);
+} finally {
+  await browser.close();
 }
 console.log(`Frames are kept in ${work}; delete that folder when done.`);
