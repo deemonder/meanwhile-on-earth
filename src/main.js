@@ -32,6 +32,9 @@ const RECORDED_HISTORY = 5500;
 const frozenNow = Date.parse(new URLSearchParams(location.search).get('at') ?? '');
 const nowMs = () => (Number.isFinite(frozenNow) ? frozenNow : Date.now());
 
+/** ?poster: only the planet and the headline, for screenshots and recordings. */
+const POSTER = new URLSearchParams(location.search).has('poster');
+
 // ───────── State ─────────
 
 /** The starting view: 2,000 light-years away, looking at Rome. */
@@ -54,6 +57,8 @@ let driftBusy = false;
 let marked = null; // where the observer's star is currently drawn
 let flightEnds = 0; // while the camera is flying somewhere, follow mode must not interrupt it
 let journey = null; // { position } while the automatic trip is running
+let eventsTried = false; // the events file has loaded, or failed to
+let shownHash = location.hash; // the link the current state came from
 const intros = new Map(); // key → Wikipedia introduction, or null while absent
 
 function readHash() {
@@ -66,6 +71,8 @@ function readHash() {
   if (params.has('lat') && params.has('lng') && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) parsed.aim = { lat, lng };
   const place = placeById(params.get('from'));
   if (place) Object.assign(parsed, { place: place.id, ly: place.ly });
+  const clock = Number(params.get('t'));
+  if (params.has('t') && Number.isFinite(clock)) parsed.clock = clock;
   return parsed;
 }
 
@@ -338,6 +345,13 @@ function render() {
   fill('world', absent ? '' : worldHtml(view, famous));
   fill('era', eraHtml(view, eraIntro));
   fill('telescope', telescopeHtml(view));
+
+  // For recorders: which link this picture answers, and whether it is complete
+  // (data loaded, nothing still easing into place).
+  const settled =
+    map.status !== 'loading' && drift.status !== 'loading' && eventsTried && earth.isSettled();
+  Object.assign(document.documentElement.dataset, { view: shownHash, settled: String(settled) });
+  if (POSTER && !settled) requestRender();
 }
 
 let renderQueued = false;
@@ -506,10 +520,12 @@ function listen() {
 
   // A link pasted into the address bar of an open page.
   addEventListener('hashchange', () => {
-    const next = readHash();
+    const { clock, ...next } = readHash();
     journey = null;
+    shownHash = location.hash;
     Object.assign(state, { place: null, ...next, follow: false });
-    if (next.aim) fly(next.aim, 800);
+    if (clock !== undefined) earth.setClock(clock);
+    if (next.aim) fly(next.aim, POSTER ? 0 : 800); // a poster shows the place at once
     requestRender();
   });
 
@@ -529,7 +545,7 @@ async function start() {
   // for the link-preview image.
   // ?poster=1200x630 fixes the size of the picture whatever the window is.
   const posterParam = new URLSearchParams(location.search).get('poster');
-  const poster = posterParam !== null;
+  const poster = POSTER;
   document.body.classList.toggle('poster', poster);
   if (new URLSearchParams(location.search).get('borders') === 'off') state.borders = false;
   const [posterWidth, posterHeight] = (posterParam ?? '').split('x').map(Number);
@@ -578,7 +594,7 @@ async function start() {
 
   // ?t=12.5 freezes the animation clock (clouds, stars) at that many seconds,
   // so a recording can step through it frame by frame.
-  const clock = new URLSearchParams(location.search).get('t');
+  const clock = new URLSearchParams(location.search).get('t') ?? readHash().clock ?? null;
   if (clock !== null && Number.isFinite(Number(clock))) earth.setClock(Number(clock));
 
   state.follow = canFollow(placeById(state.place));
@@ -598,10 +614,11 @@ async function start() {
     eventCount = await loadEvents();
     $('status').textContent = t('eventsLoaded', number(eventCount));
     eventsNow.ly = null;
-    requestRender();
   } catch {
     // The globe, borders and eras still work without the events file.
   }
+  eventsTried = true;
+  requestRender();
 }
 
 start();

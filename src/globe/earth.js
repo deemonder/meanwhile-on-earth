@@ -166,7 +166,9 @@ export async function createEarth(container, on) {
       uniforms.uCloudShift.value = (uniforms.uCloudShift.value + dt * CLOUD_DRIFT) % 1;
       sky.tick(dt);
     }
-    const blend = 1 - Math.exp(-dt * 5);
+    // With the clock set by hand (a recording), jump straight to the targets:
+    // each frame must show its own state, not a blend on the way to it.
+    const blend = clockFrozen ? 1 : 1 - Math.exp(-dt * 5);
     for (const name of EASED) uniforms[name].value += (targets[name] - uniforms[name].value) * blend;
     uniforms.uAir.value.lerp(targetAir, blend);
     uniforms.uTint.value.lerp(targetTint, blend);
@@ -220,6 +222,11 @@ export async function createEarth(container, on) {
       uniforms.uTime.value = seconds;
       uniforms.uCloudShift.value = (seconds * CLOUD_DRIFT) % 1;
       sky.setTime(seconds);
+    },
+
+    /** True once every eased value has reached its target: the picture has stopped changing. */
+    isSettled() {
+      return EASED.every((name) => Math.abs(targets[name] - uniforms[name].value) < 0.01);
     },
 
     /** Points the camera so that (lat, lng) sits under the crosshair. */
