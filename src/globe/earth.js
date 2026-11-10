@@ -6,13 +6,16 @@ import {
   SRGBColorSpace, TextureLoader, Vector3,
 } from 'three';
 import { paintMap } from '../data/borders.js';
+import { paintContinents } from '../data/continents.js';
 import { LOOKS, atmosphere, clouds, surface } from './shader.js';
 import { createSky } from './sky.js';
 
 const RADIUS = 100; // globe.gl's planet radius, in scene units
 const CLOUD_HEIGHT = 1.006;
 const AIR_HEIGHT = 1.13;
-const EASED = ['uBordersMix', 'uCityLights', 'uCloudCover', 'uIce', 'uPaleo', 'uSnowball', 'uArchean', 'uMolten'];
+const EASED = [
+  'uBordersMix', 'uCityLights', 'uCloudCover', 'uIce', 'uPaleo', 'uDrift', 'uSnowball', 'uArchean', 'uMolten',
+];
 
 /**
  * @param {HTMLElement} container
@@ -42,7 +45,12 @@ export async function createEarth(container, on) {
   mapCanvas.height = mapCanvas.width / 2;
   const borders = new CanvasTexture(mapCanvas);
   borders.colorSpace = SRGBColorSpace;
-  for (const texture of [day, night, cloudMap, borders]) {
+  const paleoCanvas = document.createElement('canvas');
+  paleoCanvas.width = 2048;
+  paleoCanvas.height = 1024;
+  const paleoMap = new CanvasTexture(paleoCanvas);
+  paleoMap.colorSpace = SRGBColorSpace;
+  for (const texture of [day, night, cloudMap, borders, paleoMap]) {
     texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   }
 
@@ -55,6 +63,7 @@ export async function createEarth(container, on) {
     uRelief: { value: relief },
     uClouds: { value: cloudMap },
     uBorders: { value: borders },
+    uPaleoMap: { value: paleoMap },
     uSun: { value: new Vector3(1, 0, 0) },
     uAir: { value: new Color(LOOKS.today.air) },
     uTint: { value: new Color(LOOKS.today.cloudTint) },
@@ -65,6 +74,7 @@ export async function createEarth(container, on) {
     uCityLights: { value: 1 },
     uIce: { value: 0 },
     uPaleo: { value: 0 },
+    uDrift: { value: 0 },
     uSnowball: { value: 0 },
     uArchean: { value: 0 },
     uMolten: { value: 0 },
@@ -231,6 +241,19 @@ export async function createEarth(container, on) {
         borders.needsUpdate = true;
       }
       applyLayers();
+    },
+
+    /**
+     * Shows the continents where they were: `rings` are outlines from
+     * data/continents.js, `iceEdge` the latitude beyond which land is under
+     * ice (or null). Pass null rings to return to today's geography.
+     */
+    setContinents(rings, iceEdge = null) {
+      if (rings) {
+        paintContinents(paleoCanvas, rings, iceEdge);
+        paleoMap.needsUpdate = true;
+      }
+      targets.uDrift = rings ? 1 : 0;
     },
 
     /** Shows or hides the loaded map without discarding it. */

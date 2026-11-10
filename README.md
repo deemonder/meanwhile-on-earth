@@ -22,13 +22,14 @@ Meanwhile on Earth is a 3D globe that shows that view. Pick a distance, aim at a
 - **A planet, not a map.** Drifting clouds and their shadows, mountain relief, the Sun glinting off the oceans, and an atmosphere that glows at the limb and reddens at dusk. The historical borders are a layer you can switch off.
 - **Journey through time.** One button drifts you away from Earth and plays history backwards, from today to before the planet formed. It steps through distances whose light left at the same time of day, so the Sun stays put while the centuries change.
 - **Real vantage points.** Choose Vega, Polaris, the Pleiades or another star, and the camera moves to the side of Earth that faced it at that moment. The star appears in the sky by name, and rings mark the point that has it overhead.
+- **Continental drift.** Beyond five million years the continents move to where plate reconstructions put them: India adrift in the ocean, the Atlantic closing, Pangaea, and on back to a billion years ago.
 - **Deep time.** Ice ages, Snowball Earth, the oxygen-free Archean, the molten Hadean, and the time before Earth existed.
 - **A reality check**: the panel says how large a telescope mirror would have to be. From 2,000 light-years it is 1.3 billion km across, 8.5 times the distance from Earth to the Sun.
 - Italian and English. Every view has a shareable link.
 
 ## See it move
 
-Keep going and the planet itself changes: ice sheets, drifting continents, a frozen world, green seas, a magma ocean, and then no Earth at all.
+Keep going and the planet itself changes: ice sheets, continents sliding back into Pangaea, a frozen world, green seas, a magma ocean, and then no Earth at all.
 
 ![From the last ice age to before the Universe](docs/deep-time.gif)
 
@@ -50,6 +51,7 @@ Other commands:
 | `npm run build` | Builds the static site into `dist/` (works on GitHub Pages) |
 | `npm test` | Checks the astronomy against worked examples from Meeus |
 | `npm run build-events` | Rebuilds `public/data/events.json` from Wikidata |
+| `npm run build-continents` | Rebuilds the continental-drift outlines from the GPlates Web Service |
 
 Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `?poster=1200x630` shows only the planet and the headline at that size, for screenshots. The link-preview image was made that way, and so were the animations: `npm run make-media` photographs the app frame by frame with a headless browser and joins the frames with ffmpeg. A third parameter, `?at=2026-11-10T10:30:00Z`, freezes the clock so every frame shows the same instant.
 
@@ -70,7 +72,8 @@ Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `
 - **Nobody could build that telescope.** The site imagines a perfect one. The mirror size shown is the diffraction limit for resolving 10 metres.
 - **Rotation is unknown beyond about 6,000 years.** ΔT is extrapolated from ancient eclipse records. Further back the day/night lighting is indicative, and the site says so.
 - **Borders are snapshots.** The nearest of 53 maps is used, and its year is shown. Borders in the ancient world were rarely lines on the ground.
-- **Deep-time continents are today's.** They are drawn faintly as a reference. The ice sheets are a sketch, not a reconstruction.
+- **Drifting continents keep today's coastlines.** The plate model moves the present-day outlines; the true shorelines of the time are lost. Land colours follow latitude, not the real climate of the period, and the ice sheets are a sketch.
+- **Nobody knows the map beyond a billion years.** Further back the oldest reconstruction stays on screen, and the site says so.
 - **Cosmological distances** mean light-travel time here, not comoving distance.
 - **Events are what Wikidata has**, and it knows Europe better than the rest of the world. The number of dots says as much about the database as about history. Births between 1960 and 1990 are missing from the current snapshot because those queries timed out.
 - **The star field is decorative.** Only the Sun and the observer's star are in their true directions.
@@ -84,10 +87,11 @@ Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `
 | [Wikidata](https://www.wikidata.org) | Events | CC0 |
 | [Wikipedia](https://www.wikipedia.org) | Introductions and images, loaded on demand | CC BY-SA |
 | [historical-basemaps](https://github.com/aourednik/historical-basemaps) by André Ourednik | Historical borders, loaded from a CDN at run time | GPL-3.0 |
+| [GPlates Web Service](https://gws.gplates.org), plate model of Müller et al. 2022 | Continental drift, prebuilt into `public/data/continents/` | CC BY 4.0 |
 | [NASA Visible Earth](https://visibleearth.nasa.gov) | Earth textures, via [three-globe](https://github.com/vasturiano/three-globe) | Public domain |
 | [globe.gl](https://globe.gl) and [three.js](https://threejs.org) | 3D rendering | MIT |
 
-Astronomy: Jean Meeus, *Astronomical Algorithms*, 2nd ed.; Morrison & Stephenson (2004) for ΔT.
+Astronomy: Jean Meeus, *Astronomical Algorithms*, 2nd ed.; Morrison & Stephenson (2004) for ΔT. Plate motions: Müller et al., "A tectonic-rules-based mantle reference frame since 1 billion years ago", *Solid Earth* 13 (2022).
 
 ## Licence
 
@@ -111,6 +115,7 @@ Meanwhile on Earth («Nel frattempo sulla Terra») è un globo 3D che mostra que
 - **Un pianeta, non una mappa**: nuvole, rilievi, riflesso del Sole sugli oceani e atmosfera. I confini storici si possono spegnere.
 - **Viaggio nel tempo**: un pulsante ti allontana dalla Terra e fa scorrere la storia all'indietro.
 - **Punti di osservazione reali**: scegli Vega, la Stella Polare o le Pleiadi, e la vista si sposta sul lato della Terra che era rivolto verso quella stella.
+- **Deriva dei continenti**: oltre i cinque milioni di anni i continenti si spostano dove li collocano le ricostruzioni delle placche, fino alla Pangea e a un miliardo di anni fa.
 - **Tempo profondo**: glaciazioni, Terra palla di neve, Archeano, Adeano, e il periodo in cui la Terra non esisteva.
 
 Provalo subito: **[demo online](https://deemonder.github.io/meanwhile-on-earth/)**. Per avviarlo sul tuo computer: `npm install`, poi `npm run dev`.

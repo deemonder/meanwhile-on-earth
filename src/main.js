@@ -9,6 +9,7 @@ import {
 } from './core/sky.js';
 import { clampLy, lyFromSlider, sliderFromLy } from './core/scale.js';
 import { loadMap, mapFor, territoryAt } from './data/borders.js';
+import { DRIFT_AGES, OLDEST_KNOWN, driftAgeFor, loadContinents, onLand, polarIceEdge } from './data/continents.js';
 import { cityLightsIn, eraAt, hasEarth } from './data/eras.js';
 import { KINDS, eventsAround, loadEvents, mostFamous, nearest } from './data/events.js';
 import { loadLandMask, surfaceAt } from './data/land.js';
@@ -48,6 +49,8 @@ let eventCount = 0;
 let eventsNow = { ly: null, list: [] };
 let map = { file: null, year: null, status: 'none', territories: null };
 let mapBusy = false;
+let drift = { age: null, status: 'none', rings: null, painted: null }; // reconstructed continents
+let driftBusy = false;
 let marked = null; // where the observer's star is currently drawn
 let flightEnds = 0; // while the camera is flying somewhere, follow mode must not interrupt it
 let journey = null; // { position } while the automatic trip is running
@@ -211,6 +214,52 @@ async function fetchMap() {
   requestRender();
 }
 
+/** Looks in which the continents are drawn where the plate model puts them. */
+const DRIFT_LOOKS = new Set(['paleo', 'snowball', 'archean']);
+
+/** Keeps the continents in step with the age, the same way updateMap does for borders. */
+function updateDrift(view) {
+  const wanted = DRIFT_LOOKS.has(view.era.look) ? driftAgeFor(view.age) : null;
+  if (wanted === null) {
+    if (drift.age !== null) {
+      drift = { age: null, status: 'none', rings: null, painted: null };
+      earth.setContinents(null);
+    }
+    return;
+  }
+  if (wanted !== drift.age) {
+    drift = { age: wanted, status: 'loading', rings: null, painted: null };
+    fetchDrift();
+    return;
+  }
+  if (drift.status !== 'ready') return;
+  // The same outlines can need repainting: polar ice comes and goes with the exact age.
+  const iceEdge = polarIceEdge(view.age);
+  const painted = `${drift.age}|${iceEdge}`;
+  if (drift.painted === painted) return;
+  drift.painted = painted;
+  earth.setContinents(drift.rings, iceEdge);
+}
+
+async function fetchDrift() {
+  if (driftBusy) return;
+  driftBusy = true;
+  const asked = drift.age;
+  try {
+    const rings = await loadContinents(asked);
+    if (drift.age === asked) drift = { ...drift, status: 'ready', rings };
+    // Fetch the neighbouring ages ahead of time, so dragging the slider
+    // flips through them without waiting.
+    const at = DRIFT_AGES.indexOf(asked);
+    for (const near of DRIFT_AGES.slice(Math.max(0, at - 2), at + 5)) loadContinents(near).catch(() => {});
+  } catch {
+    if (drift.age === asked) drift = { ...drift, status: 'failed' };
+  }
+  driftBusy = false;
+  if (drift.status === 'loading') fetchDrift(); // the age moved on meanwhile
+  requestRender();
+}
+
 function renderHud(view) {
   const { big, details } = headline(view.calendar, view.age);
   $('hud-kicker').textContent = t('hudKicker', distanceText(view.age));
@@ -251,6 +300,7 @@ function render() {
   earth.showBorders(state.borders);
   updateEvents(view);
   updateMap(view);
+  updateDrift(view);
   const star = view.overhead && !view.place.sun ? view.overhead : null;
   if (!star) {
     if (marked) earth.setObserver((marked = null));
@@ -268,7 +318,12 @@ function render() {
   // Where the map names nobody, say whether that is water or unclaimed land.
   const surface = territory ? null : surfaceAt(state.aim);
   const unnamed = surface === 'sea' ? t('sea') : surface === 'land' ? t('unclaimed') : '';
-  $('aim-label').textContent = map.status !== 'ready' || !state.borders ? '' : territory ? territory.name : unnamed;
+  // In deep time there are no borders, only land and ocean where they were then.
+  const ground = drift.status === 'ready' ? (onLand(drift.rings, state.aim) ? 'dryLand' : 'ocean') : null;
+  const driftInfo = ground && { ground, age: drift.age, known: view.age <= OLDEST_KNOWN };
+  $('aim-label').textContent = driftInfo
+    ? t(ground)
+    : map.status !== 'ready' || !state.borders ? '' : territory ? territory.name : unnamed;
   renderHud(view);
   renderControls(view);
 
@@ -278,7 +333,7 @@ function render() {
   const eraIntro = introOnceLoaded(`era|${lang}|${view.era.wiki.en}`, () => introForArticle(view.era.wiki, lang));
 
   fill('moment', momentHtml(view));
-  fill('aim', aimHtml(view, state.aim, { ...map, territory, surface }, territoryIntro(territory)));
+  fill('aim', aimHtml(view, state.aim, { ...map, territory, surface, drift: driftInfo }, territoryIntro(territory)));
   fill('nearby', absent ? '' : nearbyHtml(view, hits));
   fill('world', absent ? '' : worldHtml(view, famous));
   fill('era', eraHtml(view, eraIntro));

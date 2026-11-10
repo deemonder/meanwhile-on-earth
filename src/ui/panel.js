@@ -46,7 +46,8 @@ function visibilityHtml(view, aim) {
 /**
  * @param {object} view     the computed moment (see main.js)
  * @param {object} aim      { lat, lng } under the crosshair
- * @param {object} map      { status: 'none'|'loading'|'failed'|'ready', year, territory, surface }
+ * @param {object} map      { status: 'none'|'loading'|'failed'|'ready', year, territory, surface, drift }
+ *                          drift, in deep time: { ground: 'dryLand'|'ocean', age (My), known }
  *                          surface is 'sea', 'land' or null, and matters when there is no territory
  * @param {object|null} intro  Wikipedia introduction for the territory, when loaded
  */
@@ -69,6 +70,9 @@ export function aimHtml(view, aim, map, intro) {
     body += `<p class="note">${t('mapLoading')}</p>`;
   } else if (map.status === 'failed') {
     body += `<p class="note">${t('mapFailed')}</p>`;
+  } else if (map.drift) {
+    body += `<p class="territory">${t(map.drift.ground)}</p>`;
+    body += `<p class="note">${map.drift.known ? t('driftNote', number(map.drift.age)) : t('driftUnknown')}</p>`;
   } else if (GHOST_LOOKS.has(view.era.look)) {
     body += `<p class="note">${t('ghostContinents')}</p>`;
   }
