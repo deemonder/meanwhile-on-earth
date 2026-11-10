@@ -5,7 +5,7 @@ const TEXT = {
     tagline: 'Se una civiltà aliena ci stesse osservando da lontano, cosa vedrebbe in questo momento?',
     distance: 'Quanto sei lontano dalla Terra?',
     lightYears: 'anni luce',
-    hudKicker: 'Da quella distanza vedresti',
+    hudKicker: (distance) => `Da ${distance} di distanza vedresti`,
     now: 'Adesso',
     journey: 'Viaggio nel tempo',
     journeyStop: 'Ferma il viaggio',
@@ -96,7 +96,7 @@ const TEXT = {
     tagline: 'If an alien civilization were watching us from far away, what would it see right now?',
     distance: 'How far from Earth are you?',
     lightYears: 'light-years',
-    hudKicker: 'From that far away you would see',
+    hudKicker: (distance) => `From ${distance} away you would see`,
     now: 'Now',
     journey: 'Journey through time',
     journeyStop: 'Stop the journey',
@@ -186,6 +186,9 @@ const TEXT = {
 };
 
 function initialLanguage() {
+  // A link can ask for a language: ?lang=en
+  const asked = new URLSearchParams(location.search).get('lang');
+  if (asked in TEXT) return asked;
   try {
     const saved = localStorage.getItem('meanwhile-on-earth.lang');
     if (saved in TEXT) return saved;

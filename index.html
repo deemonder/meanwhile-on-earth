@@ -12,6 +12,20 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%232f6fdd'/%3E%3Cpath d='M32 6a26 26 0 0 1 0 52a40 40 0 0 0 0-52z' fill='%230a1024'/%3E%3C/svg%3E"
     />
+    <!-- How the link looks when shared in chats and on social networks -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Meanwhile on Earth" />
+    <meta property="og:title" content="Meanwhile on Earth" />
+    <meta
+      property="og:description"
+      content="2,000 light-years away, someone is watching the Roman Empire right now. Pick a distance and see what they see."
+    />
+    <meta property="og:url" content="https://deemonder.github.io/meanwhile-on-earth/" />
+    <meta property="og:image" content="https://deemonder.github.io/meanwhile-on-earth/preview.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Earth seen from 2,000 light-years away: the year is AD 26 and the Roman Empire is marked on the globe." />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -39,7 +53,7 @@
             <button id="help" type="button">?</button>
           </div>
           <div id="hud">
-            <p class="label" data-t="hudKicker"></p>
+            <p class="label" id="hud-kicker"></p>
             <p id="hud-big"></p>
             <p id="hud-details"></p>
           </div>
@@ -74,6 +88,8 @@
             <div id="chips"></div>
           </div>
         </section>
+
+        <p id="poster-line" data-t="tagline"></p>
 
         <div id="guide" hidden>
           <div class="guide-card" role="dialog" aria-modal="true" aria-labelledby="guide-title">
