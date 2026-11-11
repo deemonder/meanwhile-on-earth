@@ -65,8 +65,15 @@ export const surface = {
     uniform sampler2D uWater;    // white = sea, black = land
     uniform sampler2D uRelief;   // height map
     uniform sampler2D uClouds;
-    uniform sampler2D uBorders;  // historical map, drawn on a canvas
-    uniform sampler2D uPaleoMap; // reconstructed continents, drawn on a canvas
+    // Historical map and reconstructed continents, each drawn on a canvas.
+    // There are two of each, so a new picture can fade in over the old one:
+    // the Fade uniform runs from 0 (all A) to 1 (all B).
+    uniform sampler2D uBordersA;
+    uniform sampler2D uBordersB;
+    uniform float uBordersFade;
+    uniform sampler2D uPaleoA;
+    uniform sampler2D uPaleoB;
+    uniform float uPaleoFade;
     uniform vec3 uSun;           // direction to the Sun, world space
     uniform vec3 uAir;           // colour of the atmosphere
     uniform float uCloudShift;
@@ -131,7 +138,9 @@ export const surface = {
       // Continental drift. Where a reconstruction is loaded it replaces today's
       // geography altogether. Its canvas holds opaque land, a faint halo for
       // the shallow seas around it, and nothing over open ocean.
-      vec4 paleo = texture2D(uPaleoMap, vUv);
+      // Blending two reconstructions makes land that is in both stay put while
+      // the rest sinks into shallow sea and rises again: it reads as motion.
+      vec4 paleo = mix(texture2D(uPaleoA, vUv), texture2D(uPaleoB, vUv), uPaleoFade);
       float paleoLand = smoothstep(0.6, 0.92, paleo.a);
       vec3 paleoSea = mix(vec3(0.012, 0.055, 0.17), vec3(0.05, 0.3, 0.4), smoothstep(0.0, 0.5, paleo.a));
       vec3 paleoRock = paleo.rgb * (0.7 + 0.6 * fbm(n * 16.0));
@@ -174,7 +183,12 @@ export const surface = {
       colour += vec3(1.0, 0.94, 0.82) * glint * openWater * lit;
 
       // Historical borders, dimmed but still readable on the night side.
-      vec4 borders = texture2D(uBorders, vUv);
+      // Blending two coloured maps turns them to mud half way, so the new map
+      // dissolves in patch by patch instead: each spot switches when the fade
+      // passes its own noise value.
+      float patchy = clamp((grain - 0.25) * 2.0, 0.0, 1.0);
+      float switched = smoothstep(patchy - 0.1, patchy + 0.1, uBordersFade * 1.2 - 0.1);
+      vec4 borders = mix(texture2D(uBordersA, vUv), texture2D(uBordersB, vUv), switched);
       colour = mix(colour, borders.rgb * (0.14 + 0.86 * lit), borders.a * uBordersMix);
 
       // Magma ocean: a dark crust split by glowing, slowly shifting cracks.

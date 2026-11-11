@@ -180,7 +180,12 @@ const work = join(tmpdir(), 'meanwhile-on-earth-media');
 const browser = await puppeteer.launch({
   executablePath: BROWSER,
   headless: true,
-  args: ['--hide-scrollbars', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+  args: [
+    '--hide-scrollbars', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist',
+    // Edge may restart itself in a second process on launch, which cuts the
+    // connection to this script. Chrome ignores the flag.
+    '--edge-skip-compat-layer-relaunch',
+  ],
 });
 try {
   for (const name of wanted) await record(browser, name, CLIPS[name], work);

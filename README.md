@@ -63,7 +63,7 @@ Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `
 
 **Which side faces the star.** A star's J2000 coordinates are precessed to the date in question (in Roman times Polaris sat 12° from the pole). The point on Earth with the star overhead is the centre of the hemisphere the observer sees.
 
-**Borders** are painted onto a single texture and wrapped around the globe, so moving through the centuries stays smooth. Finding the territory under the crosshair is a point-in-polygon test.
+**Borders** are painted onto a texture and wrapped around the globe, so moving through the centuries stays smooth. There are two textures per layer: the next map is painted onto the hidden one and then dissolves in, and drifting continents blend from one reconstruction to the next. Finding the territory under the crosshair is a point-in-polygon test.
 
 **Events** are fetched from Wikidata once, by `scripts/build-events.mjs`, and shipped as a static file. A live query from the browser would take tens of seconds.
 
