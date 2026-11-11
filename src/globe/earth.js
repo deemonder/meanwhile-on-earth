@@ -2,11 +2,12 @@
 // its clouds and atmosphere use our own shaders, and the sky is our own too.
 import Globe from 'globe.gl';
 import {
-  AdditiveBlending, BackSide, CanvasTexture, Color, Mesh, RepeatWrapping, ShaderMaterial, SphereGeometry,
-  SRGBColorSpace, TextureLoader, Vector3,
+  AdditiveBlending, BackSide, Color, Mesh, RepeatWrapping, ShaderMaterial, SphereGeometry, SRGBColorSpace,
+  TextureLoader, Vector3,
 } from 'three';
 import { paintMap } from '../data/borders.js';
 import { paintContinents } from '../data/continents.js';
+import { fadingLayer } from './fading.js';
 import { LOOKS, atmosphere, clouds, surface } from './shader.js';
 import { createSky } from './sky.js';
 
@@ -41,19 +42,14 @@ export async function createEarth(container, on) {
   const renderer = globe.renderer();
   const scene = globe.scene();
 
-  const mapCanvas = document.createElement('canvas');
-  mapCanvas.width = Math.min(4096, renderer.capabilities.maxTextureSize);
-  mapCanvas.height = mapCanvas.width / 2;
-  const borders = new CanvasTexture(mapCanvas);
-  borders.colorSpace = SRGBColorSpace;
-  const paleoCanvas = document.createElement('canvas');
-  paleoCanvas.width = 2048;
-  paleoCanvas.height = 1024;
-  const paleoMap = new CanvasTexture(paleoCanvas);
-  paleoMap.colorSpace = SRGBColorSpace;
-  for (const texture of [day, night, cloudMap, borders, paleoMap]) {
-    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  }
+  const sharpest = renderer.capabilities.getMaxAnisotropy();
+  for (const texture of [day, night, cloudMap]) texture.anisotropy = sharpest;
+
+  // Each layer keeps two textures to fade between; phones get smaller ones.
+  const phone = matchMedia('(max-width: 900px)').matches;
+  const mapWidth = Math.min(phone ? 2048 : 4096, renderer.capabilities.maxTextureSize);
+  const borders = fadingLayer(mapWidth, mapWidth / 2, sharpest);
+  const continents = fadingLayer(2048, 1024, sharpest);
 
   // Uniform objects are shared between the three materials, so setting the
   // Sun or the cloud drift once updates all of them.
@@ -63,8 +59,12 @@ export async function createEarth(container, on) {
     uWater: { value: water },
     uRelief: { value: relief },
     uClouds: { value: cloudMap },
-    uBorders: { value: borders },
-    uPaleoMap: { value: paleoMap },
+    uBordersA: { value: borders.textures[0] },
+    uBordersB: { value: borders.textures[1] },
+    uBordersFade: borders.fade,
+    uPaleoA: { value: continents.textures[0] },
+    uPaleoB: { value: continents.textures[1] },
+    uPaleoFade: continents.fade,
     uSun: { value: new Vector3(1, 0, 0) },
     uAir: { value: new Color(LOOKS.today.air) },
     uTint: { value: new Color(LOOKS.today.cloudTint) },
@@ -172,6 +172,8 @@ export async function createEarth(container, on) {
     for (const name of EASED) uniforms[name].value += (targets[name] - uniforms[name].value) * blend;
     uniforms.uAir.value.lerp(targetAir, blend);
     uniforms.uTint.value.lerp(targetTint, blend);
+    borders.step(dt, clockFrozen);
+    continents.step(dt, clockFrozen);
     requestAnimationFrame(animate);
   })(last);
 
@@ -226,7 +228,11 @@ export async function createEarth(container, on) {
 
     /** True once every eased value has reached its target: the picture has stopped changing. */
     isSettled() {
-      return EASED.every((name) => Math.abs(targets[name] - uniforms[name].value) < 0.01);
+      return (
+        borders.settled &&
+        continents.settled &&
+        EASED.every((name) => Math.abs(targets[name] - uniforms[name].value) < 0.01)
+      );
     },
 
     /** Points the camera so that (lat, lng) sits under the crosshair. */
@@ -260,10 +266,8 @@ export async function createEarth(container, on) {
     /** Loads a historical map onto the surface, or unloads it with null. */
     setBorders(territories) {
       bordersLoaded = Boolean(territories);
-      if (territories) {
-        paintMap(mapCanvas, territories);
-        borders.needsUpdate = true;
-      }
+      if (territories) borders.show((canvas) => paintMap(canvas, territories));
+      else borders.clear();
       applyLayers();
     },
 
@@ -273,10 +277,8 @@ export async function createEarth(container, on) {
      * ice (or null). Pass null rings to return to today's geography.
      */
     setContinents(rings, iceEdge = null) {
-      if (rings) {
-        paintContinents(paleoCanvas, rings, iceEdge);
-        paleoMap.needsUpdate = true;
-      }
+      if (rings) continents.show((canvas) => paintContinents(canvas, rings, iceEdge));
+      else continents.clear();
       targets.uDrift = rings ? 1 : 0;
     },
 
