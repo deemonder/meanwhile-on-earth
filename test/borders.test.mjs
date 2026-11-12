@@ -1,7 +1,8 @@
 // Filling a map's blanks from the maps just before it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CARRY_MAPS, CARRY_YEARS, MAPS, earlierMaps, mapFor, territoryAt } from '../src/data/borders.js';
+import { mapFor, territoryAt } from '../src/data/borders.js';
+import { pack, ringArea, simplify, unpack } from '../src/data/outlines.js';
 
 const square = (name, west, south, east, north) => ({
   name,
@@ -14,20 +15,6 @@ test('the nearest map is chosen for a year', () => {
   assert.equal(mapFor(1069).file, '1100');
   assert.equal(mapFor(2026).file, '2010');
   assert.equal(mapFor(-400000), null);
-});
-
-test('only recent maps may fill blanks', () => {
-  const by = (file) => MAPS.find((m) => m.file === file);
-  assert.deepEqual(earlierMaps(by('1100')).map((m) => m.file), ['1000', '900', '800']);
-  // 1279 and 1300 are 21 years apart: the count limit applies, not the years.
-  assert.deepEqual(earlierMaps(by('1400')).map((m) => m.file), ['1300', '1279', '1200']);
-  // Ancient maps are millennia apart, so nothing is recent enough to carry.
-  assert.deepEqual(earlierMaps(by('bc3000')), []);
-  for (const map of MAPS) {
-    const earlier = earlierMaps(map);
-    assert.ok(earlier.length <= CARRY_MAPS);
-    assert.ok(earlier.every((m) => m.year < map.year && map.year - m.year <= CARRY_YEARS));
-  }
 });
 
 test('a blank piece of land takes the last holder known from an earlier map', () => {
@@ -51,4 +38,23 @@ test('a blank piece of land takes the last holder known from an earlier map', ()
   assert.equal(territoryAt({ ...view, blank: [] }, { lat: 5, lng: 5 }), null);
   // Without earlier maps a blank stays blank.
   assert.equal(territoryAt({ ...view, carried: [] }, { lat: 5, lng: 5 }), null);
+});
+
+test('outlines survive packing, to a tenth of a degree', () => {
+  const ring = [[12.34, 41.9], [13.02, 42.11], [12.71, 43.48], [12.34, 41.9]];
+  const back = unpack(pack(ring));
+  assert.equal(back.length, ring.length);
+  back.forEach(([lng, lat], i) => {
+    assert.ok(Math.abs(lng - ring[i][0]) <= 0.05 && Math.abs(lat - ring[i][1]) <= 0.05);
+  });
+  assert.deepEqual(back.box, [12.3, 41.9, 13, 43.5]);
+});
+
+test('simplifying keeps the shape of a closed outline', () => {
+  // A square with many points along each side: only the corners matter.
+  const side = (from, to) => Array.from({ length: 10 }, (_, i) => [from[0] + ((to[0] - from[0]) * i) / 10, from[1] + ((to[1] - from[1]) * i) / 10]);
+  const square = [...side([0, 0], [10, 0]), ...side([10, 0], [10, 10]), ...side([10, 10], [0, 10]), ...side([0, 10], [0, 0]), [0, 0]];
+  const simple = simplify(square, 0.1);
+  assert.ok(simple.length <= 6, `kept ${simple.length} points`);
+  assert.ok(Math.abs(ringArea(simple) - 100) < 1);
 });

@@ -52,7 +52,7 @@ Other commands:
 | `npm test` | Checks the astronomy against worked examples from Meeus |
 | `npm run build-events` | Rebuilds `public/data/events.json` from Wikidata |
 | `npm run build-continents` | Rebuilds the continental-drift outlines from the GPlates Web Service |
-| `npm run audit-borders` | Measures where the historical maps contradict each other; `-- --write` rebuilds the added territories |
+| `npm run audit-borders` | Measures where the historical maps contradict each other; `-- --write` rebuilds `public/data/carried/` and the added territories |
 
 Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `?poster=1200x630` shows only the planet and the headline at that size, for screenshots. The link-preview image was made that way, and so were the animations: `npm run make-media` photographs the app frame by frame with a headless browser and joins the frames with ffmpeg. A third parameter, `?at=2026-11-10T10:30:00Z`, freezes the clock so every frame shows the same instant.
 
@@ -72,7 +72,7 @@ Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `
 
 - **Nobody could build that telescope.** The site imagines a perfect one. The mirror size shown is the diffraction limit for resolving 10 metres.
 - **Rotation is unknown beyond about 6,000 years.** ΔT is extrapolated from ancient eclipse records. Further back the day/night lighting is indicative, and the site says so.
-- **Borders are snapshots, and the snapshots disagree.** The nearest of 53 maps is used, and its year is shown. The maps were drawn one at a time: the share of land that carries a name swings from 62% to 100% between them, so a land can be named in one map, blank in the next and named again later. Where a map is blank, the site shows the holder from a map up to three steps and 300 years earlier, and says so. That removes 84% of the places that would otherwise blink out for one map (`npm run audit-borders` measures it); the rest still do. Land with no record at all is tinted grey.
+- **Borders are snapshots, and the snapshots disagree.** The nearest of 53 maps is used, and its year is shown. The maps were drawn one at a time: the share of land that carries a name swings from 62% to 100% between them, so a land can be named in one map, blank in the next and named again later. Where a map is blank, the site shows the last holder named by an earlier map, and says so. It does this when that map is at most 300 years older, or when the gap closes: a later map names the place again within 600 years of the earlier one. Of 2,190 places that would otherwise blink out for a map, 81 are left, all before 2000 BC, where the maps are thousands of years apart and a blank is honest ignorance (`npm run audit-borders` measures this and rebuilds the fill-ins). Carried names can be out of date: they are the last ones the maps give. Land with no record at all is tinted grey.
 - **Disputed territories follow the sources.** Kosovo is missing from the 2010 map, so it is added from Natural Earth and labelled as disputed. Other disputes are shown however the dataset draws them.
 - **Drifting continents keep today's coastlines.** The plate model moves the present-day outlines; the true shorelines of the time are lost. Land colours follow latitude, not the real climate of the period, and the ice sheets are a sketch.
 - **Nobody knows the map beyond a billion years.** Further back the oldest reconstruction stays on screen, and the site says so.
@@ -81,6 +81,28 @@ Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `
 - **The star field is decorative.** Only the Sun and the observer's star are in their true directions.
 - **Clouds are one modern snapshot**, drifting slowly. Nobody knows the weather of AD 26.
 - **City lights** fade in between 1880 and 2000 using a modern night image. They cannot show which cities were lit first.
+
+## Help find the mistakes
+
+This project stitches together a great deal of data: 53 world maps with thousands of named territories, 13,000 events, 73 plate reconstructions. Nobody has checked all of it, and it certainly contains errors: a territory under the wrong name, a border in the wrong century, a state that is missing, an event in the wrong place. Contributions that find and fix them are welcome.
+
+**If you spot something wrong**, [open an issue](https://github.com/deemonder/meanwhile-on-earth/issues/new). The most useful report has three things:
+
+1. A link to the view. "Copy a link to this view" in the app gives one with the distance and the place in it.
+2. What the site shows there.
+3. What it should show, ideally with a source.
+
+**If you want to fix it yourself**, pull requests are welcome too. Where a fix belongs depends on where the error comes from:
+
+| The error is in | Fix it |
+| --- | --- |
+| A territory's shape or name on one of the maps | Upstream, in [historical-basemaps](https://github.com/aourednik/historical-basemaps), so every project using the maps benefits. Then update `VERSION` in `src/data/borders.js`. |
+| A territory the maps lack altogether | `ADDITIONS` in `scripts/audit-borders.mjs`, the way Kosovo is added. |
+| A place that is named, blank, then named again | The carry rule at the top of `scripts/audit-borders.mjs`. Run `npm run audit-borders` to see what it leaves. |
+| An event (date, place, name) | On [Wikidata](https://www.wikidata.org) itself, then `npm run build-events`. |
+| The text for an era, or anything in the app | Here: `src/data/eras.js`, `src/i18n.js`. |
+
+Two reports from Reddit, a vanishing Philippines and a missing Kosovo, led to an audit of all 53 maps. One good catch goes a long way.
 
 ## Data and credits
 
@@ -120,6 +142,8 @@ Meanwhile on Earth («Nel frattempo sulla Terra») è un globo 3D che mostra que
 - **Punti di osservazione reali**: scegli Vega, la Stella Polare o le Pleiadi, e la vista si sposta sul lato della Terra che era rivolto verso quella stella.
 - **Deriva dei continenti**: oltre i cinque milioni di anni i continenti si spostano dove li collocano le ricostruzioni delle placche, fino alla Pangea e a un miliardo di anni fa.
 - **Tempo profondo**: glaciazioni, Terra palla di neve, Archeano, Adeano, e il periodo in cui la Terra non esisteva.
+
+**Aiutaci a trovare gli errori.** Il progetto mette insieme moltissimi dati: 53 mappe del mondo con migliaia di territori, 13.000 eventi, 73 ricostruzioni dei continenti. Nessuno li ha controllati tutti, e di sicuro contengono errori e imprecisioni. Se ne trovi uno, [apri una segnalazione](https://github.com/deemonder/meanwhile-on-earth/issues/new) con il link alla vista (pulsante «Copia il link a questa vista»), cosa mostra il sito e cosa dovrebbe mostrare. Sono benvenute anche le correzioni dirette: la sezione «Help find the mistakes» qui sopra spiega dove va ciascuna.
 
 Provalo subito: **[demo online](https://deemonder.github.io/meanwhile-on-earth/)**. Per avviarlo sul tuo computer: `npm install`, poi `npm run dev`.
 

@@ -1,5 +1,8 @@
 // Measures where the historical maps contradict themselves over time, and
-// writes the territories the dataset lacks (public/data/map-additions.json).
+// writes what the app needs to paper over it:
+//
+//   public/data/carried/<map>.json   territories from earlier maps that fill a map's blanks
+//   public/data/map-additions.json   territories the dataset lacks altogether
 //
 // The maps are 53 separate snapshots drawn by hand. Nothing forces one to
 // agree with the next: the share of land that carries a name swings between
@@ -7,23 +10,33 @@
 // in the next and named again after that. Drawn as they are, countries would
 // vanish and come back as the years go by.
 //
-// The app softens this (see src/data/borders.js): where a map draws land
-// without a name, it shows the holder from a map up to CARRY_MAPS steps and
-// CARRY_YEARS years earlier, marked as carried over. This script follows a
-// grid of points through all the maps and reports how many such blanks there
-// are, and how many the rule fills.
+// THE RULE. Where a map draws land without a name, the last holder named by an
+// earlier map is shown instead (and marked as carried over), provided that
+//
+//   - that earlier map is at most RECENT years older, or
+//   - the place is named again by a later map no more than BRIDGE years after
+//     the earlier one. A place that is named, blank for a map or two and then
+//     named again is far likelier a gap in those maps than a state that came
+//     apart and re-formed.
+//
+// Nothing is carried across more than BRIDGE years. The prehistoric maps are
+// thousands of years apart, and a blank between them is honest ignorance.
 //
 //   npm run audit-borders             prints the report
-//   npm run audit-borders -- --write  also rewrites public/data/map-additions.json
+//   npm run audit-borders -- --write  also rewrites the files above
 //
 // The maps are downloaded once into the system's temporary folder.
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CARRY_MAPS, CARRY_YEARS, MAPS, MAPS_URL, earlierMaps } from '../src/data/borders.js';
+import { MAPS, MAPS_URL } from '../src/data/borders.js';
+import { pack, simplify } from '../src/data/outlines.js';
 
-const GRID = 2; // degrees between sample points
+const RECENT = 300; // years
+const BRIDGE = 600; // years
+const GRID = 2; // degrees between the points used for the report
+const DETAIL = 0.08; // degrees: outlines of carried territories are simplified to this
 
 // Territories the dataset lacks, taken from Natural Earth (public domain).
 const NATURAL_EARTH =
@@ -59,7 +72,7 @@ async function cached(file, url) {
 
 async function load(map) {
   const text = await cached(`world_${map.file}.geojson`, `${MAPS_URL}world_${map.file}.geojson`);
-  return JSON.parse(text)
+  const all = JSON.parse(text)
     .features.filter((f) => f.geometry)
     .map((f) => {
       const polygons = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
@@ -72,8 +85,11 @@ async function load(map) {
           if (y > north) north = y;
         }
       }
-      return { name: f.properties.NAME ?? '', polygons, box: [west, south, east, north] };
+      const { NAME, SUBJECTO, PARTOF } = f.properties;
+      const overlord = SUBJECTO && SUBJECTO !== NAME ? SUBJECTO : PARTOF && PARTOF !== NAME ? PARTOF : null;
+      return { name: NAME ?? '', overlord, polygons, box: [west, south, east, north] };
     });
+  return { ...map, named: all.filter((f) => f.name), blank: all.filter((f) => !f.name) };
 }
 
 function inRing(ring, x, y) {
@@ -86,69 +102,116 @@ function inRing(ring, x, y) {
   return inside;
 }
 
-/** A territory's name, '' for land nobody is named on, null for sea. */
-function nameAt(features, lat, lng) {
-  let land = null;
-  for (const f of features) {
-    const [west, south, east, north] = f.box;
-    if (lng < west || lng > east || lat < south || lat > north) continue;
-    if (f.polygons.some(([outline, ...holes]) => inRing(outline, lng, lat) && !holes.some((h) => inRing(h, lng, lat)))) {
-      if (f.name) return f.name;
-      land = '';
+const contains = (feature, lat, lng) => {
+  const [west, south, east, north] = feature.box;
+  if (lng < west || lng > east || lat < south || lat > north) return false;
+  return feature.polygons.some(
+    ([outline, ...holes]) => inRing(outline, lng, lat) && !holes.some((hole) => inRing(hole, lng, lat)),
+  );
+};
+const featureAt = (features, lat, lng) => features.find((f) => contains(f, lat, lng)) ?? null;
+
+const maps = [];
+for (const map of MAPS) maps.push(await load(map));
+
+/**
+ * Who the app shows at a point that map `i` leaves blank: the territory, and
+ * the index of the earlier map it comes from. Null when the rule carries nothing.
+ */
+function carriedAt(i, lat, lng) {
+  for (let k = i - 1; k >= 0 && maps[i].year - maps[k].year <= BRIDGE; k--) {
+    const holder = featureAt(maps[k].named, lat, lng);
+    if (!holder) continue;
+    if (maps[i].year - maps[k].year <= RECENT) return { holder, from: k };
+    // Older than that: only if the gap closes, with a later map naming the place again.
+    for (let j = i + 1; j < maps.length && maps[j].year - maps[k].year <= BRIDGE; j++) {
+      if (featureAt(maps[j].named, lat, lng)) return { holder, from: k };
     }
+    return null;
   }
-  return land;
+  return null;
 }
 
-const features = [];
-for (const map of MAPS) features.push(await load(map));
+/** Points inside a piece of land: a one-degree grid over it, plus the middle of each of its parts. */
+function samplePoints(feature) {
+  const points = [];
+  for (const [outline] of feature.polygons) {
+    let x = 0, y = 0;
+    for (const [px, py] of outline) {
+      x += px;
+      y += py;
+    }
+    points.push([y / outline.length, x / outline.length]);
+  }
+  const [west, south, east, north] = feature.box;
+  for (let lat = Math.ceil(south); lat <= north; lat++) {
+    for (let lng = Math.ceil(west); lng <= east; lng++) points.push([lat, lng]);
+  }
+  return points.filter(([lat, lng]) => contains(feature, lat, lng));
+}
 
-// Follow every grid point through all the maps: as drawn, and as the app shows it.
+// ── Which earlier territories each map needs ──
+const carried = maps.map((map, i) => {
+  const bySource = new Map(); // index of earlier map → set of its territories
+  for (const piece of map.blank) {
+    for (const [lat, lng] of samplePoints(piece)) {
+      const hit = carriedAt(i, lat, lng);
+      if (!hit) continue;
+      if (!bySource.has(hit.from)) bySource.set(hit.from, new Set());
+      bySource.get(hit.from).add(hit.holder);
+    }
+  }
+  // Nearest map first: where two earlier maps both name a place, the later one wins.
+  return [...bySource].sort((a, b) => b[0] - a[0]).map(([from, holders]) => ({
+    year: maps[from].year,
+    territories: [...holders].map((holder) => ({
+      name: holder.name,
+      overlord: holder.overlord,
+      rings: holder.polygons.map(([outline]) => {
+        const simple = simplify(outline, DETAIL);
+        return pack(simple.length >= 4 ? simple : outline); // small islands survive whole
+      }),
+    })),
+  }));
+});
+
+// ── Report: follow a grid of points through all the maps ──
 const points = [];
 for (let lat = -58; lat <= 80; lat += GRID) {
   for (let lng = -179; lng < 180; lng += GRID) {
-    const drawn = features.map((f) => nameAt(f, lat, lng));
+    const drawn = maps.map((m) => featureAt(m.named, lat, lng)?.name ?? (featureAt(m.blank, lat, lng) ? '' : null));
     if (drawn.every((name) => name === null)) continue;
-    const shown = drawn.map((name, i) => {
-      if (name !== '') return name;
-      for (const earlier of earlierMaps(MAPS[i])) {
-        const held = drawn[MAPS.findIndex((m) => m.file === earlier.file)];
-        if (held) return held;
-      }
-      return '';
-    });
+    const shown = drawn.map((name, i) => (name === '' ? (carriedAt(i, lat, lng)?.holder.name ?? '') : name));
     points.push({ drawn, shown });
   }
 }
-
-/** Points blank in map i although both neighbouring maps name them: a country blinking out. */
+/** Blank in map i although both neighbouring maps show a name: a place blinking out. */
 const blinks = (key, i) =>
-  i === 0 || i === MAPS.length - 1
-    ? 0
-    : points.filter((p) => p[key][i] === '' && p[key][i - 1] && p[key][i + 1]).length;
+  i === 0 || i === maps.length - 1 ? [] : points.filter((p) => p[key][i] === '' && p[key][i - 1] && p[key][i + 1]);
+const count = (key) => maps.reduce((sum, _, i) => sum + blinks(key, i).length, 0);
+const named = (key) => {
+  const land = points.reduce((sum, p) => sum + p.drawn.filter((n) => n !== null).length, 0);
+  return Math.round((100 * points.reduce((sum, p) => sum + p[key].filter(Boolean).length, 0)) / land);
+};
 
-console.log(`${points.length} land points, every ${GRID}°, followed through ${MAPS.length} maps`);
-console.log(`Carry rule: up to ${CARRY_MAPS} maps and ${CARRY_YEARS} years back\n`);
-console.log('     map   named as drawn   named as shown   blinks as drawn   blinks as shown');
-let before = 0;
-let after = 0;
-MAPS.forEach((map, i) => {
-  const land = points.filter((p) => p.drawn[i] !== null).length;
-  const share = (key) => `${Math.round((100 * points.filter((p) => p[key][i]).length) / land)}%`;
-  const drawn = blinks('drawn', i);
-  const shown = blinks('shown', i);
-  before += drawn;
-  after += shown;
-  if (drawn > land * 0.02 || shown > land * 0.02) {
-    console.log(
-      `${map.file.padStart(8)}   ${share('drawn').padStart(14)}   ${share('shown').padStart(14)}   ` +
-        `${String(drawn).padStart(15)}   ${String(shown).padStart(15)}`,
-    );
+console.log(`${points.length} land points, every ${GRID}°, followed through ${maps.length} maps`);
+console.log(`Rule: carry up to ${RECENT} years, or across a gap that closes within ${BRIDGE} years\n`);
+console.log(`Land with a name:               ${named('drawn')}% as drawn, ${named('shown')}% as shown`);
+console.log(`Places blinking out for a map:  ${count('drawn')} as drawn, ${count('shown')} as shown`);
+
+const left = new Map();
+maps.forEach((map, i) => {
+  for (const p of blinks('shown', i)) {
+    const key = `${map.file}: ${p.shown[i - 1]} → blank → ${p.shown[i + 1]}`;
+    left.set(key, (left.get(key) ?? 0) + 1);
   }
 });
-console.log(`\nPlaces blinking out for one map: ${before} as drawn, ${after} as shown`);
+if (left.size) {
+  console.log(`\nStill blinking (the gap is longer than ${BRIDGE} years):`);
+  for (const [what, n] of [...left].sort((a, b) => b[1] - a[1]).slice(0, 12)) console.log(`  ${String(n).padStart(4)}  ${what}`);
+}
 
-// What the dataset lacks.
+// ── What the dataset lacks ──
 const naturalEarth = JSON.parse(await cached('natural-earth-50m.geojson', NATURAL_EARTH));
 const additions = {};
 for (const addition of ADDITIONS) {
@@ -160,10 +223,21 @@ for (const addition of ADDITIONS) {
     (additions[file] ??= []).push({ name: addition.name, disputed: addition.disputed, polygons: rounded });
   }
 }
-console.log(`Added territories: ${ADDITIONS.map((a) => `${a.name} (${a.maps.join(', ')})`).join('; ')}`);
+console.log(`\nAdded territories: ${ADDITIONS.map((a) => `${a.name} (${a.maps.join(', ')})`).join('; ')}`);
 
 if (process.argv.includes('--write')) {
-  const json = JSON.stringify(additions);
-  await writeFile(new URL('../public/data/map-additions.json', import.meta.url), json);
-  console.log(`Wrote public/data/map-additions.json (${(json.length / 1024).toFixed(1)} KB)`);
+  const data = new URL('../public/data/', import.meta.url);
+  await writeFile(new URL('map-additions.json', data), JSON.stringify(additions));
+  await rm(new URL('carried/', data), { recursive: true, force: true });
+  await mkdir(new URL('carried/', data), { recursive: true });
+  let bytes = 0;
+  let files = 0;
+  for (const [i, layers] of carried.entries()) {
+    if (!layers.length) continue;
+    const json = JSON.stringify({ map: maps[i].file, layers });
+    await writeFile(new URL(`carried/${maps[i].file}.json`, data), json);
+    bytes += json.length;
+    files++;
+  }
+  console.log(`Wrote map-additions.json and ${files} files in public/data/carried/ (${(bytes / 1e6).toFixed(1)} MB)`);
 }

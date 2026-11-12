@@ -8,7 +8,7 @@ import {
   subObserverPoint, subsolarPoint,
 } from './core/sky.js';
 import { clampLy, lyFromSlider, sliderFromLy } from './core/scale.js';
-import { earlierMaps, loadMap, mapFor, territoryAt } from './data/borders.js';
+import { loadCarried, loadMap, mapFor, territoryAt } from './data/borders.js';
 import { DRIFT_AGES, OLDEST_KNOWN, driftAgeFor, loadContinents, onLand, polarIceEdge } from './data/continents.js';
 import { cityLightsIn, eraAt, hasEarth } from './data/eras.js';
 import { KINDS, eventsAround, loadEvents, mostFamous, nearest } from './data/events.js';
@@ -272,16 +272,11 @@ async function fetchDrift() {
 
 /**
  * The maps do not always agree with each other: a land named in one can be
- * left blank in the next. Once a map is showing, this fetches the few maps
- * before it, so that its blanks show the last holder known from those.
+ * left blank in the next. Once a map is showing, this fetches the territories
+ * from earlier maps that fill its blanks with their last known holder.
  */
 async function fillBlanks(asked) {
-  let carried = [];
-  try {
-    carried = await Promise.all(earlierMaps(asked).map(loadMap));
-  } catch {
-    // The map still shows, only with its blanks left blank.
-  }
+  const carried = await loadCarried(asked); // empty if there are none, or they cannot be fetched
   if (map.file !== asked.file) return; // the year has moved on
   map = { ...map, view: { ...map.view, carried }, carry: 'done' };
   if (carried.length) earth.setBorders(map.view);
