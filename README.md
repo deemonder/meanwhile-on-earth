@@ -52,6 +52,7 @@ Other commands:
 | `npm test` | Checks the astronomy against worked examples from Meeus |
 | `npm run build-events` | Rebuilds `public/data/events.json` from Wikidata |
 | `npm run build-continents` | Rebuilds the continental-drift outlines from the GPlates Web Service |
+| `npm run audit-borders` | Measures where the historical maps contradict each other; `-- --write` rebuilds the added territories |
 
 Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `?poster=1200x630` shows only the planet and the headline at that size, for screenshots. The link-preview image was made that way, and so were the animations: `npm run make-media` photographs the app frame by frame with a headless browser and joins the frames with ffmpeg. A third parameter, `?at=2026-11-10T10:30:00Z`, freezes the clock so every frame shows the same instant.
 
@@ -71,7 +72,8 @@ Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `
 
 - **Nobody could build that telescope.** The site imagines a perfect one. The mirror size shown is the diffraction limit for resolving 10 metres.
 - **Rotation is unknown beyond about 6,000 years.** ΔT is extrapolated from ancient eclipse records. Further back the day/night lighting is indicative, and the site says so.
-- **Borders are snapshots.** The nearest of 53 maps is used, and its year is shown. Borders in the ancient world were rarely lines on the ground.
+- **Borders are snapshots, and the snapshots disagree.** The nearest of 53 maps is used, and its year is shown. The maps were drawn one at a time: the share of land that carries a name swings from 62% to 100% between them, so a land can be named in one map, blank in the next and named again later. Where a map is blank, the site shows the holder from a map up to three steps and 300 years earlier, and says so. That removes 84% of the places that would otherwise blink out for one map (`npm run audit-borders` measures it); the rest still do. Land with no record at all is tinted grey.
+- **Disputed territories follow the sources.** Kosovo is missing from the 2010 map, so it is added from Natural Earth and labelled as disputed. Other disputes are shown however the dataset draws them.
 - **Drifting continents keep today's coastlines.** The plate model moves the present-day outlines; the true shorelines of the time are lost. Land colours follow latitude, not the real climate of the period, and the ice sheets are a sketch.
 - **Nobody knows the map beyond a billion years.** Further back the oldest reconstruction stays on screen, and the site says so.
 - **Cosmological distances** mean light-travel time here, not comoving distance.
@@ -88,6 +90,7 @@ Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `
 | [Wikipedia](https://www.wikipedia.org) | Introductions and images, loaded on demand | CC BY-SA |
 | [historical-basemaps](https://github.com/aourednik/historical-basemaps) by André Ourednik | Historical borders, loaded from a CDN at run time | GPL-3.0 |
 | [GPlates Web Service](https://gws.gplates.org), plate model of Müller et al. 2022 | Continental drift, prebuilt into `public/data/continents/` | CC BY 4.0 |
+| [Natural Earth](https://www.naturalearthdata.com) | Territories missing from the historical maps (Kosovo) | Public domain |
 | [NASA Visible Earth](https://visibleearth.nasa.gov) | Earth textures, via [three-globe](https://github.com/vasturiano/three-globe) | Public domain |
 | [globe.gl](https://globe.gl) and [three.js](https://threejs.org) | 3D rendering | MIT |
 

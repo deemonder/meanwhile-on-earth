@@ -4,11 +4,19 @@
 // (https://github.com/aourednik/historical-basemaps, GPL-3.0): one GeoJSON
 // world map for each of 53 dates between 123,000 BC and 2010. They are loaded
 // from a CDN when needed rather than copied into this repository.
+//
+// The maps are separate snapshots, drawn one at a time, and they do not always
+// agree: a land can be named in one, left blank in the next and named again
+// later (scripts/audit-borders.mjs measures how often). Shown as they are,
+// countries would blink out and back as the years go by. So where a map is
+// silent about a piece of land, the last holder known from a slightly earlier
+// map is shown instead, and marked as carried over.
 
-const SOURCES = [
-  'https://cdn.jsdelivr.net/gh/aourednik/historical-basemaps@master/geojson/',
-  'https://raw.githubusercontent.com/aourednik/historical-basemaps/master/geojson/',
-];
+// One fixed version of the dataset. The maps are still being edited upstream,
+// and anything measured or added here refers to this version.
+const VERSION = '4b5039e50d8d2464b065bd76ad6086cd4597108d'; // 2 November 2026
+export const MAPS_URL = `https://cdn.jsdelivr.net/gh/aourednik/historical-basemaps@${VERSION}/geojson/`;
+const SOURCES = [MAPS_URL, `https://raw.githubusercontent.com/aourednik/historical-basemaps/${VERSION}/geojson/`];
 
 const FILES = [
   'bc123000', 'bc10000', 'bc8000', 'bc5000', 'bc4000', 'bc3000', 'bc2000', 'bc1500', 'bc1000',
@@ -27,19 +35,54 @@ export const MAPS = FILES.map((file) => ({
 /** Before this the oldest map (archaic humans, 123,000 BC) no longer applies. */
 const OLDEST_YEAR = -300000;
 
+/** How far back a map may be to vouch for land that a later map leaves blank. */
+export const CARRY_YEARS = 300;
+export const CARRY_MAPS = 3;
+
 /** The map closest in time to `year`, or null when none is relevant. */
 export function mapFor(year) {
   if (year < OLDEST_YEAR) return null;
   return MAPS.reduce((best, map) => (Math.abs(map.year - year) < Math.abs(best.year - year) ? map : best));
 }
 
-const loaded = new Map();
+/** The maps just before `map` whose territories can fill its blanks, nearest first. */
+export function earlierMaps(map) {
+  const at = MAPS.findIndex((m) => m.file === map.file);
+  return MAPS.slice(Math.max(0, at - CARRY_MAPS), at)
+    .reverse()
+    .filter((m) => map.year - m.year <= CARRY_YEARS);
+}
 
-/** Resolves to the list of named territories on a map. Results are cached. */
+const loaded = new Map();
+let additions = null;
+
+/** Territories missing from the dataset altogether (see scripts/audit-borders.mjs). */
+function loadAdditions() {
+  additions ??= fetch(`${import.meta.env.BASE_URL}data/map-additions.json`)
+    .then((response) => (response.ok ? response.json() : {}))
+    .catch(() => ({}));
+  return additions;
+}
+
+/**
+ * Resolves to one map: `named` territories and the `blank` pieces of land it
+ * draws without a name. Results are cached.
+ */
 export function loadMap(map) {
   if (!loaded.has(map.file)) {
-    const pending = download(`world_${map.file}.geojson`)
-      .then((geojson) => geojson.features.filter((f) => f.geometry && f.properties?.NAME).map(toTerritory))
+    const pending = Promise.all([download(`world_${map.file}.geojson`), loadAdditions()])
+      .then(([geojson, extra]) => {
+        const features = geojson.features.filter((f) => f.geometry);
+        const added = (extra[map.file] ?? []).map((a) =>
+          toTerritory({ properties: { NAME: a.name }, geometry: { type: 'MultiPolygon', coordinates: a.polygons } }, a),
+        );
+        return {
+          year: map.year,
+          // Added territories come first: they lie on top of whatever the map drew there.
+          named: [...added, ...features.filter((f) => f.properties?.NAME).map((f) => toTerritory(f))],
+          blank: features.filter((f) => !f.properties?.NAME).map((f) => toTerritory(f)),
+        };
+      })
       .catch((error) => {
         loaded.delete(map.file); // let a later attempt retry
         throw error;
@@ -63,7 +106,7 @@ async function download(name) {
   throw lastError;
 }
 
-function toTerritory(feature) {
+function toTerritory(feature, extra = {}) {
   const { NAME, SUBJECTO, PARTOF } = feature.properties;
   const polygons =
     feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates] : feature.geometry.coordinates;
@@ -86,13 +129,15 @@ function toTerritory(feature) {
   // Provinces and vassals share the colour of the power they answer to.
   const overlord = SUBJECTO && SUBJECTO !== NAME ? SUBJECTO : PARTOF && PARTOF !== NAME ? PARTOF : null;
   return {
-    name: NAME,
+    name: NAME ?? null,
     overlord,
-    hue: hueOf(overlord ?? NAME),
+    hue: hueOf(overlord ?? NAME ?? ''),
     polygons,
     box: [west, south, east, north],
     area,
     label: { lat: biggest.lat, lng: biggest.lng },
+    disputed: Boolean(extra.disputed),
+    added: 'disputed' in extra || 'name' in extra,
   };
 }
 
@@ -127,41 +172,63 @@ function ringContains(ring, lng, lat) {
   return inside;
 }
 
-/** The territory containing a point, or null over sea and unclaimed land. */
-export function territoryAt(territories, { lat, lng }) {
-  for (const territory of territories) {
-    const [west, south, east, north] = territory.box;
+function pieceAt(pieces, { lat, lng }) {
+  for (const piece of pieces) {
+    const [west, south, east, north] = piece.box;
     if (lng < west || lng > east || lat < south || lat > north) continue;
-    for (const [outline, ...holes] of territory.polygons) {
-      if (ringContains(outline, lng, lat) && !holes.some((hole) => ringContains(hole, lng, lat))) {
-        return territory;
-      }
+    for (const [outline, ...holes] of piece.polygons) {
+      if (ringContains(outline, lng, lat) && !holes.some((hole) => ringContains(hole, lng, lat))) return piece;
     }
   }
   return null;
 }
 
 /**
- * Paints the territories onto an equirectangular canvas (longitude across,
- * latitude down), which the globe then wraps around the planet. One texture
- * is far cheaper than hundreds of 3D polygons, so scrubbing through the
- * centuries stays smooth.
+ * The territory at a point, or null over sea and over land with no record.
+ *
+ * `view` is a map as returned by loadMap, optionally with `carried`: earlier
+ * maps, nearest first. Where the map itself names nobody but draws land, the
+ * nearest earlier map that names someone there answers instead, and the
+ * result says so with `carriedFrom` (that map's year).
  */
-export function paintMap(canvas, territories) {
-  const ctx = canvas.getContext('2d');
-  const { width, height } = canvas;
-  const x = (lng) => ((lng + 180) / 360) * width;
-  const y = (lat) => ((90 - lat) / 180) * height;
-  ctx.clearRect(0, 0, width, height);
-  ctx.lineJoin = 'round';
+export function territoryAt(view, point) {
+  const own = pieceAt(view.named, point);
+  if (own) return own;
+  if (!view.carried?.length || !pieceAt(view.blank, point)) return null;
+  for (const earlier of view.carried) {
+    const held = pieceAt(earlier.named, point);
+    if (held) return { ...held, carriedFrom: earlier.year };
+  }
+  return null;
+}
 
-  for (const territory of territories) {
-    ctx.beginPath();
-    for (const rings of territory.polygons) {
+// ───────── Painting ─────────
+
+let scratch = null;
+
+/** Traces territories as one path in canvas coordinates. */
+function trace(ctx, pieces, x, y) {
+  ctx.beginPath();
+  for (const piece of pieces) {
+    for (const rings of piece.polygons) {
       for (const ring of rings) {
         ring.forEach(([lng, lat], i) => (i ? ctx.lineTo(x(lng), y(lat)) : ctx.moveTo(x(lng), y(lat))));
         ctx.closePath();
       }
+    }
+  }
+}
+
+/** Fills and outlines each territory in its own colour. */
+function colour(ctx, territories, x, y, width, replace) {
+  for (const territory of territories) {
+    trace(ctx, [territory], x, y);
+    if (replace) {
+      // Clear what is underneath first, so two see-through colours never mix.
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = '#000';
+      ctx.fill('evenodd');
+      ctx.globalCompositeOperation = 'source-over';
     }
     ctx.fillStyle = `hsla(${territory.hue}, 75%, 58%, 0.34)`;
     ctx.fill('evenodd');
@@ -169,15 +236,66 @@ export function paintMap(canvas, territories) {
     ctx.lineWidth = width / 2048;
     ctx.stroke();
   }
+}
+
+/**
+ * Paints a map onto an equirectangular canvas (longitude across, latitude
+ * down), which the globe then wraps around the planet. One texture is far
+ * cheaper than hundreds of 3D polygons, so scrubbing through the centuries
+ * stays smooth.
+ *
+ * From the bottom up: land with no record, in a faint grey so that it reads
+ * as "nothing known" rather than as missing; territories carried over from
+ * earlier maps, slightly paler; the map's own territories; names.
+ */
+export function paintMap(canvas, view) {
+  const ctx = canvas.getContext('2d');
+  const { width, height } = canvas;
+  const x = (lng) => ((lng + 180) / 360) * width;
+  const y = (lat) => ((90 - lat) / 180) * height;
+  ctx.clearRect(0, 0, width, height);
+  ctx.lineJoin = 'round';
+
+  trace(ctx, view.blank, x, y);
+  ctx.fillStyle = 'rgba(200, 208, 224, 0.13)';
+  ctx.fill('evenodd');
+
+  const carried = view.carried ?? [];
+  if (carried.length && view.blank.length) {
+    if (!scratch || scratch.width !== width) scratch = Object.assign(document.createElement('canvas'), { width, height });
+    const under = scratch.getContext('2d');
+    under.clearRect(0, 0, width, height);
+    under.lineJoin = 'round';
+    // Oldest first, each newer map replacing what it covers.
+    for (const earlier of [...carried].reverse()) colour(under, earlier.named, x, y, width, true);
+    // Keep only what falls on this map's blank land.
+    trace(under, view.blank, x, y);
+    under.globalCompositeOperation = 'destination-in';
+    under.fillStyle = '#000';
+    under.fill('evenodd');
+    under.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.8;
+    ctx.drawImage(scratch, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+
+  // Additions (first in the list) are painted last, replacing what they cover.
+  colour(ctx, view.named.filter((t) => !t.added), x, y, width, false);
+  colour(ctx, view.named.filter((t) => t.added), x, y, width, true);
 
   // Name the territories, biggest first. A name is skipped when it would not
-  // fit inside its territory or would run into one already written.
+  // fit inside its territory or would run into one already written. Carried
+  // territories are named only if their label falls on the part that shows.
+  const candidates = [
+    ...view.named,
+    ...carried.flatMap((earlier) => earlier.named.filter((t) => territoryAt(view, t.label)?.name === t.name)),
+  ];
   const pixelsPerDegree = width / 360;
   const written = [];
   const named = new Set();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  for (const territory of [...territories].sort((a, b) => b.area - a.area)) {
+  for (const territory of candidates.sort((a, b) => b.area - a.area)) {
     const { lat, lng } = territory.label;
     if (territory.area < 6 || named.has(territory.name) || Math.abs(lat) > 76) continue;
 

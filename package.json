@@ -11,7 +11,8 @@
     "test": "node --test",
     "build-events": "node scripts/build-events.mjs",
     "make-media": "node scripts/make-media.mjs",
-    "build-continents": "node scripts/build-continents.mjs"
+    "build-continents": "node scripts/build-continents.mjs",
+    "audit-borders": "node scripts/audit-borders.mjs"
   },
   "dependencies": {
     "globe.gl": "^2.46.2",

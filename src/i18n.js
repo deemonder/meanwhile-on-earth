@@ -37,6 +37,9 @@ const TEXT = {
     unclaimed: 'Nessuno stato conosciuto',
     unclaimedNote: 'È terraferma, ma la mappa storica non riporta qui nessuno stato o cultura per quel periodo. Non vuol dire che fosse disabitata.',
     subjectTo: (name) => `sotto il controllo di: ${name}`,
+    carriedNote: (from, map) =>
+      `La mappa del ${map} lascia vuota quest’area: il nome è ripreso da quella del ${from}.`,
+    disputedNote: 'Lo status di questo territorio è conteso: non tutti gli stati lo riconoscono.',
     mapOf: (year) => `Confini secondo la mappa storica del ${year}`,
     mapLoading: 'Carico la mappa storica…',
     mapFailed: 'Non riesco a caricare la mappa storica. Controlla la connessione.',
@@ -135,6 +138,9 @@ const TEXT = {
     unclaimed: 'No known state',
     unclaimedNote: 'This is land, but the historical map records no state or culture here for that time. That does not mean nobody lived here.',
     subjectTo: (name) => `controlled by: ${name}`,
+    carriedNote: (from, map) =>
+      `The map of ${map} leaves this area blank: the name is carried over from the map of ${from}.`,
+    disputedNote: 'The status of this territory is disputed: not every state recognises it.',
     mapOf: (year) => `Borders from the historical map of ${year}`,
     mapLoading: 'Loading the historical map…',
     mapFailed: 'Could not load the historical map. Check your connection.',

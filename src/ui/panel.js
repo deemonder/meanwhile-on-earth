@@ -59,6 +59,10 @@ export function aimHtml(view, aim, map, intro) {
     body += territory
       ? `<p class="territory"><i class="swatch" style="background:hsl(${territory.hue} 75% 58%)"></i>${escapeHtml(territory.name)}</p>` +
         (territory.overlord ? `<p class="note">${t('subjectTo', escapeHtml(territory.overlord))}</p>` : '') +
+        (territory.carriedFrom !== undefined
+          ? `<p class="note">${t('carriedNote', yearText(territory.carriedFrom), yearText(map.year))}</p>`
+          : '') +
+        (territory.disputed ? `<p class="note">${t('disputedNote')}</p>` : '') +
         introHtml(intro)
       : map.surface === 'sea'
         ? `<p class="territory">${t('sea')}</p><p class="note">${t('seaNote')}</p>`
