@@ -8,7 +8,7 @@ import {
   subObserverPoint, subsolarPoint,
 } from './core/sky.js';
 import { clampLy, lyFromSlider, sliderFromLy } from './core/scale.js';
-import { loadMap, mapFor, territoryAt } from './data/borders.js';
+import { earlierMaps, loadMap, mapFor, territoryAt } from './data/borders.js';
 import { DRIFT_AGES, OLDEST_KNOWN, driftAgeFor, loadContinents, onLand, polarIceEdge } from './data/continents.js';
 import { cityLightsIn, eraAt, hasEarth } from './data/eras.js';
 import { KINDS, eventsAround, loadEvents, mostFamous, nearest } from './data/events.js';
@@ -50,7 +50,9 @@ const state = {
 let earth = null;
 let eventCount = 0;
 let eventsNow = { ly: null, list: [] };
-let map = { file: null, year: null, status: 'none', territories: null };
+// The historical map on show. `view` is the map plus the earlier maps that fill
+// its blanks; `carry` says whether those have arrived ('pending' | 'done').
+let map = { file: null, year: null, status: 'none', view: null, carry: 'done' };
 let mapBusy = false;
 let drift = { age: null, status: 'none', rings: null, painted: null }; // reconstructed continents
 let driftBusy = false;
@@ -192,11 +194,11 @@ function updateMap(view) {
   const wanted = hasEarth(view.era.look) ? mapFor(Math.round(view.year)) : null;
   if ((wanted?.file ?? null) === map.file) return;
   if (!wanted) {
-    map = { file: null, year: null, status: 'none', territories: null };
+    map = { file: null, year: null, status: 'none', view: null, carry: 'done' };
     earth.setBorders(null);
     return;
   }
-  map = { file: wanted.file, year: wanted.year, status: 'loading', territories: null };
+  map = { file: wanted.file, year: wanted.year, status: 'loading', view: null, carry: 'pending' };
   fetchMap();
 }
 
@@ -205,10 +207,11 @@ async function fetchMap() {
   mapBusy = true;
   const asked = { file: map.file, year: map.year };
   try {
-    const territories = await loadMap(asked);
+    const own = await loadMap(asked);
     if (map.file === asked.file) {
-      map = { ...map, status: 'ready', territories };
-      earth.setBorders(territories);
+      map = { ...map, status: 'ready', view: { ...own, carried: [] } };
+      earth.setBorders(map.view);
+      fillBlanks(asked); // in its own time: the map is already on screen
     }
   } catch {
     if (map.file === asked.file) {
@@ -267,6 +270,24 @@ async function fetchDrift() {
   requestRender();
 }
 
+/**
+ * The maps do not always agree with each other: a land named in one can be
+ * left blank in the next. Once a map is showing, this fetches the few maps
+ * before it, so that its blanks show the last holder known from those.
+ */
+async function fillBlanks(asked) {
+  let carried = [];
+  try {
+    carried = await Promise.all(earlierMaps(asked).map(loadMap));
+  } catch {
+    // The map still shows, only with its blanks left blank.
+  }
+  if (map.file !== asked.file) return; // the year has moved on
+  map = { ...map, view: { ...map.view, carried }, carry: 'done' };
+  if (carried.length) earth.setBorders(map.view);
+  requestRender();
+}
+
 function renderHud(view) {
   const { big, details } = headline(view.calendar, view.age);
   $('hud-kicker').textContent = t('hudKicker', distanceText(view.age));
@@ -317,7 +338,7 @@ function render() {
   }
 
   // What floats over the globe
-  const territory = map.status === 'ready' ? territoryAt(map.territories, state.aim) : null;
+  const territory = map.status === 'ready' ? territoryAt(map.view, state.aim) : null;
   $('absent').hidden = !absent;
   $('absent').dataset.look = view.era.look;
   $('absent-text').textContent = view.era[lang][0];
@@ -355,7 +376,11 @@ function render() {
   // For recorders: which link this picture answers, and whether it is complete
   // (data loaded, nothing still easing into place).
   const settled =
-    map.status !== 'loading' && drift.status !== 'loading' && eventsTried && earth.isSettled();
+    map.status !== 'loading' &&
+    !(map.status === 'ready' && map.carry === 'pending') &&
+    drift.status !== 'loading' &&
+    eventsTried &&
+    earth.isSettled();
   Object.assign(document.documentElement.dataset, { view: shownHash, settled: String(settled) });
   if (POSTER && !settled) requestRender();
 }
