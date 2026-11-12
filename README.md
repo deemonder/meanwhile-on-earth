@@ -82,6 +82,28 @@ Two things a link can ask for: `?lang=en` or `?lang=it` sets the language, and `
 - **Clouds are one modern snapshot**, drifting slowly. Nobody knows the weather of AD 26.
 - **City lights** fade in between 1880 and 2000 using a modern night image. They cannot show which cities were lit first.
 
+## Help find the mistakes
+
+This project stitches together a great deal of data: 53 world maps with thousands of named territories, 13,000 events, 73 plate reconstructions. Nobody has checked all of it, and it certainly contains errors: a territory under the wrong name, a border in the wrong century, a state that is missing, an event in the wrong place. Contributions that find and fix them are welcome.
+
+**If you spot something wrong**, [open an issue](https://github.com/deemonder/meanwhile-on-earth/issues/new). The most useful report has three things:
+
+1. A link to the view. "Copy a link to this view" in the app gives one with the distance and the place in it.
+2. What the site shows there.
+3. What it should show, ideally with a source.
+
+**If you want to fix it yourself**, pull requests are welcome too. Where a fix belongs depends on where the error comes from:
+
+| The error is in | Fix it |
+| --- | --- |
+| A territory's shape or name on one of the maps | Upstream, in [historical-basemaps](https://github.com/aourednik/historical-basemaps), so every project using the maps benefits. Then update `VERSION` in `src/data/borders.js`. |
+| A territory the maps lack altogether | `ADDITIONS` in `scripts/audit-borders.mjs`, the way Kosovo is added. |
+| A place that is named, blank, then named again | The carry rule at the top of `scripts/audit-borders.mjs`. Run `npm run audit-borders` to see what it leaves. |
+| An event (date, place, name) | On [Wikidata](https://www.wikidata.org) itself, then `npm run build-events`. |
+| The text for an era, or anything in the app | Here: `src/data/eras.js`, `src/i18n.js`. |
+
+Two reports from Reddit, a vanishing Philippines and a missing Kosovo, led to an audit of all 53 maps. One good catch goes a long way.
+
 ## Data and credits
 
 | Source | Used for | Licence |
@@ -120,6 +142,8 @@ Meanwhile on Earth («Nel frattempo sulla Terra») è un globo 3D che mostra que
 - **Punti di osservazione reali**: scegli Vega, la Stella Polare o le Pleiadi, e la vista si sposta sul lato della Terra che era rivolto verso quella stella.
 - **Deriva dei continenti**: oltre i cinque milioni di anni i continenti si spostano dove li collocano le ricostruzioni delle placche, fino alla Pangea e a un miliardo di anni fa.
 - **Tempo profondo**: glaciazioni, Terra palla di neve, Archeano, Adeano, e il periodo in cui la Terra non esisteva.
+
+**Aiutaci a trovare gli errori.** Il progetto mette insieme moltissimi dati: 53 mappe del mondo con migliaia di territori, 13.000 eventi, 73 ricostruzioni dei continenti. Nessuno li ha controllati tutti, e di sicuro contengono errori e imprecisioni. Se ne trovi uno, [apri una segnalazione](https://github.com/deemonder/meanwhile-on-earth/issues/new) con il link alla vista (pulsante «Copia il link a questa vista»), cosa mostra il sito e cosa dovrebbe mostrare. Sono benvenute anche le correzioni dirette: la sezione «Help find the mistakes» qui sopra spiega dove va ciascuna.
 
 Provalo subito: **[demo online](https://deemonder.github.io/meanwhile-on-earth/)**. Per avviarlo sul tuo computer: `npm install`, poi `npm run dev`.
 
