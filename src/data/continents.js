@@ -4,6 +4,8 @@
 // outlines of the continents as the plate model of Müller et al. 2022 places
 // them. They are today's coastlines carried along by their plates.
 
+import { unpack } from './outlines.js';
+
 /** Ages with a reconstruction, in millions of years: every 10 up to 550, then every 25. */
 export const DRIFT_AGES = [
   ...Array.from({ length: 55 }, (_, i) => (i + 1) * 10),
@@ -46,7 +48,7 @@ export function loadContinents(age) {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
       })
-      .then(({ rings }) => rings.map(decode))
+      .then(({ rings }) => rings.map(unpack))
       .catch((error) => {
         loaded.delete(age); // let a later attempt retry
         throw error;
@@ -54,27 +56,6 @@ export function loadContinents(age) {
     loaded.set(age, pending);
   }
   return loaded.get(age);
-}
-
-/** Undoes the packing done by the build script: differences in tenths of a degree. */
-function decode(packed) {
-  const points = [];
-  let x = 0;
-  let y = 0;
-  let west = 180, south = 90, east = -180, north = -90;
-  for (let i = 0; i < packed.length; i += 2) {
-    x += packed[i];
-    y += packed[i + 1];
-    const lng = x / 10;
-    const lat = y / 10;
-    points.push([lng, lat]);
-    if (lng < west) west = lng;
-    if (lng > east) east = lng;
-    if (lat < south) south = lat;
-    if (lat > north) north = lat;
-  }
-  points.box = [west, south, east, north];
-  return points;
 }
 
 /** True when the point lies on reconstructed land. */

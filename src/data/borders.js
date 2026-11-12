@@ -9,8 +9,12 @@
 // agree: a land can be named in one, left blank in the next and named again
 // later (scripts/audit-borders.mjs measures how often). Shown as they are,
 // countries would blink out and back as the years go by. So where a map is
-// silent about a piece of land, the last holder known from a slightly earlier
-// map is shown instead, and marked as carried over.
+// silent about a piece of land, the last holder known from an earlier map is
+// shown instead, and marked as carried over. Which earlier territories each
+// map needs is worked out ahead of time by that script, under the rule
+// written at the top of it, and stored in public/data/carried/.
+
+import { unpack } from './outlines.js';
 
 // One fixed version of the dataset. The maps are still being edited upstream,
 // and anything measured or added here refers to this version.
@@ -35,22 +39,10 @@ export const MAPS = FILES.map((file) => ({
 /** Before this the oldest map (archaic humans, 123,000 BC) no longer applies. */
 const OLDEST_YEAR = -300000;
 
-/** How far back a map may be to vouch for land that a later map leaves blank. */
-export const CARRY_YEARS = 300;
-export const CARRY_MAPS = 3;
-
 /** The map closest in time to `year`, or null when none is relevant. */
 export function mapFor(year) {
   if (year < OLDEST_YEAR) return null;
   return MAPS.reduce((best, map) => (Math.abs(map.year - year) < Math.abs(best.year - year) ? map : best));
-}
-
-/** The maps just before `map` whose territories can fill its blanks, nearest first. */
-export function earlierMaps(map) {
-  const at = MAPS.findIndex((m) => m.file === map.file);
-  return MAPS.slice(Math.max(0, at - CARRY_MAPS), at)
-    .reverse()
-    .filter((m) => map.year - m.year <= CARRY_YEARS);
 }
 
 const loaded = new Map();
@@ -90,6 +82,36 @@ export function loadMap(map) {
     loaded.set(map.file, pending);
   }
   return loaded.get(map.file);
+}
+
+const carriedFor = new Map();
+
+/**
+ * Resolves to the territories from earlier maps that fill this map's blanks:
+ * a list of { year, named }, nearest map first. Empty when the map has none.
+ */
+export function loadCarried(map) {
+  if (!carriedFor.has(map.file)) {
+    const pending = fetch(`${import.meta.env.BASE_URL}data/carried/${map.file}.json`)
+      .then((response) => (response.ok ? response.json() : { layers: [] }))
+      .then(({ layers }) =>
+        layers.map((layer) => ({
+          year: layer.year,
+          named: layer.territories.map((t) =>
+            toTerritory({
+              properties: { NAME: t.name, SUBJECTO: t.overlord },
+              geometry: { type: 'MultiPolygon', coordinates: t.rings.map((ring) => [unpack(ring)]) },
+            }),
+          ),
+        })),
+      )
+      .catch(() => {
+        carriedFor.delete(map.file); // let a later attempt retry
+        return [];
+      });
+    carriedFor.set(map.file, pending);
+  }
+  return carriedFor.get(map.file);
 }
 
 async function download(name) {
@@ -186,9 +208,9 @@ function pieceAt(pieces, { lat, lng }) {
 /**
  * The territory at a point, or null over sea and over land with no record.
  *
- * `view` is a map as returned by loadMap, optionally with `carried`: earlier
- * maps, nearest first. Where the map itself names nobody but draws land, the
- * nearest earlier map that names someone there answers instead, and the
+ * `view` is a map as returned by loadMap, optionally with `carried` as
+ * returned by loadCarried. Where the map itself names nobody but draws land,
+ * the nearest earlier map that names someone there answers instead, and the
  * result says so with `carriedFrom` (that map's year).
  */
 export function territoryAt(view, point) {
